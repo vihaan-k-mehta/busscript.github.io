@@ -1,0 +1,3 @@
+* text=auto
+# later rules win: keep the launcher's CRLF line endings exactly as written
+start.bat -text

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Busscript: a CAN bus tool you can script</title>
+  <meta name="description" content="A live CAN bus analyzer with a REST API and an MCP server, so scripts, CI jobs and AI assistants can read signals and send frames. Free, MIT licence, runs on your Windows PC.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="tokens.css">
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font: 400 17px/1.6 var(--font-sans); color: var(--color-text); background: var(--color-bg); }
+    a { color: var(--color-link); }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+    header.site { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; }
+    header.site .brand { font-weight: 700; font-size: 20px; letter-spacing: .2px; text-decoration: none; color: var(--color-text); display: inline-flex; align-items: center; gap: 8px; }
+    nav a { margin-left: 16px; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; margin: 8px 0 16px; letter-spacing: -.5px; }
+    h2 { font-size: 28px; line-height: 1.2; margin: 0 0 12px; }
+    h3 { font-size: 18px; margin: 0 0 4px; }
+    section { padding: 48px 0; }
+    section + section { border-top: 1px solid var(--color-border); }
+    .lead { font-size: 20px; color: var(--color-text-muted); max-width: 46em; margin: 0 0 24px; }
+    .btn { display: inline-block; padding: 10px 20px; border-radius: var(--radius-md); background: var(--color-accent); color: var(--color-on-accent); text-decoration: none; font-weight: 600; }
+    .btn.secondary { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border-input); margin-left: 8px; }
+    .shot { display: block; width: 100%; height: auto; border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); margin-top: 32px; background: var(--color-surface); }
+    figure { margin: 0; }
+    figcaption { color: var(--color-text-muted); font-size: 15px; margin-top: 8px; }
+    .cols { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px 20px; }
+    .card p { margin: 4px 0 0; }
+    code, pre { font-family: var(--font-mono); font-size: 14px; }
+    pre { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; overflow-x: auto; margin: 12px 0; }
+    ol.steps { padding-left: 20px; } ol.steps li { margin-bottom: 8px; }
+    details { border-bottom: 1px solid var(--color-border); padding: 12px 0; }
+    summary { cursor: pointer; font-weight: 600; }
+    details p { margin: 8px 0 0; color: var(--color-text-muted); }
+    table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    .limits li { margin-bottom: 6px; }
+    footer { padding: 32px 0 48px; color: var(--color-text-muted); font-size: 15px; border-top: 1px solid var(--color-border); }
+    .skip { position: absolute; left: -999px; } .skip:focus { left: 8px; top: 8px; background: var(--color-bg); padding: 8px; z-index: 10; }
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="site">
+    <a class="brand" href="#top"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#0f766e"/><path d="M4 20h6l3-10 4 14 3-8h8" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Busscript</a>
+    <nav aria-label="Page"><a href="#features">Features</a><a href="#start">Get started</a><a href="#faq">FAQ</a></nav>
+  </header>
+
+  <main id="main">
+    <section id="top" aria-labelledby="h-hero">
+      <h1 id="h-hero">Script your CAN bus.</h1>
+      <p class="lead">Busscript is a live CAN bus analyzer with a REST API and an MCP server. Your scripts, CI jobs and AI assistants can read a signal by name and send a frame, with no plugin and no Windows-only COM server.</p>
+      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/archive/refs/heads/main.zip">Download (zip)</a><a class="btn secondary" href="#start">How to run it</a>
+      <figure>
+        <img class="shot" src="img/measurement.png" width="1440" height="849" alt="The Busscript Measurement view with a live frame trace, decoded signal values, bus statistics, a signal plot and an event log, running on the built-in demo bus.">
+        <figcaption>The Measurement view on the built-in demo bus: no hardware needed to try it.</figcaption>
+      </figure>
+    </section>
+
+    <section aria-labelledby="h-problem">
+      <h2 id="h-problem">CAN tools are hard to drive from code</h2>
+      <div class="cols">
+        <div class="card"><h3>Automation takes a detour</h3><p>Controlling a desktop analyzer from a script usually means a Windows COM interface, examples in one language, and a workaround for every signal you want to set.</p></div>
+        <div class="card"><h3>Logs do not travel well</h3><p>A log from one tool may not open in another, extended identifiers can get lost in conversion, and being handed a log file with no idea how to play it back is a common first problem.</p></div>
+      </div>
+      <p class="muted" style="color:var(--color-text-muted);font-size:15px;margin-top:12px">Based on a small sample of public developer questions (9 posts, 2011 to 2021). It is a direction, not a survey.</p>
+    </section>
+
+    <section id="features" aria-labelledby="h-features">
+      <h2 id="h-features">What you can do with it</h2>
+      <div class="cols">
+        <div class="card"><h3>Send a signal by name</h3><p>Post <code>EngineData</code> with <code>{"Gear": "Second", "ThrottlePos": 20}</code>. Busscript encodes it with your DBC file. Values out of range are refused, so a typo does not become a frame.</p></div>
+        <div class="card"><h3>REST for everything the UI does</h3><p>Start and stop, read decoded signals, transmit, log and replay over plain HTTP, from any language. A runnable Python example and curl commands are in the README.</p></div>
+        <div class="card"><h3>An MCP server for AI assistants</h3><p>Thirteen tools: read frames and signals, start logging, replay a file, and more. It is off until you switch it on, each tool has its own switch, and every call shows in an activity log.</p></div>
+        <div class="card"><h3>Careful about transmitting</h3><p>Channels start listen-only. MCP transmit is a separate switch, off by default and limited to 20 frames a second. File paths from an assistant stay inside one folder.</p></div>
+        <div class="card"><h3>Logs that keep their identifiers</h3><p>ASC and BLF logs, written and read back with extended and standard identifiers intact (tested). Replay a log at any speed, or in a loop.</p></div>
+        <div class="card"><h3>Runs on your machine</h3><p>One local program for Windows (Python plus your browser). It listens only on 127.0.0.1, needs a token, and sends nothing anywhere.</p></div>
+      </div>
+      <h2 style="margin-top:40px">And the analyzer basics</h2>
+      <p class="lead" style="font-size:17px">Live trace with decoded names, a signal table with units and value tables, a plot, bus load and error counts, ID filters, cyclic transmit, CAN FD, DBC files per channel.</p>
+      <figure>
+        <img class="shot" src="img/mcp.png" width="1440" height="849" alt="The Busscript MCP settings dialog showing the enable switch, a client connection snippet with the token hidden, and a list of tools each with a switch.">
+        <figcaption>MCP settings: an on switch, a connection snippet, a switch per tool and a separate transmit switch.</figcaption>
+      </figure>
+    </section>
+
+    <section id="start" aria-labelledby="h-start">
+      <h2 id="h-start">Download and run</h2>
+      <ol class="steps">
+        <li><strong>Install Python 3.11 or newer</strong> from <a href="https://www.python.org/downloads/">python.org</a> if you do not have it. Tick "Add python.exe to PATH".</li>
+        <li><strong><a href="https://github.com/vihaan-k-mehta/busscript.github.io/archive/refs/heads/main.zip">Download the zip</a></strong> and unzip it anywhere.</li>
+        <li><strong>Double-click <code>start.bat</code></strong>. The first run sets itself up in about a minute and needs internet once. Your browser then opens on a demo bus with synthetic traffic, so you can try everything with no hardware.</li>
+        <li><strong>Use your own adapter:</strong> run <code>start.bat live</code>, add a channel on the Setup tab and attach a DBC file.</li>
+        <li><strong>Drive it from code:</strong> call the REST API, or switch on MCP and connect your assistant.</li>
+      </ol>
+      <pre tabindex="0" aria-label="Example commands"><code>TOKEN=$(cat ~/busscript-data/token)
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"channel":"demo","message":"VehicleSpeed","signals":{"Speed":42.5}}'   http://127.0.0.1:8765/api/transmit/signal</code></pre>
+      <p>The README has the MCP tool list, the safety notes and a runnable Python example. The source is on <a href="https://github.com/vihaan-k-mehta/busscript.github.io">GitHub</a>.</p>
+    </section>
+
+    <section aria-labelledby="h-price">
+      <h2 id="h-price">Pricing</h2>
+      <table>
+        <thead><tr><th scope="col">Plan</th><th scope="col">For</th><th scope="col">Price</th></tr></thead>
+        <tbody><tr><th scope="row">Busscript</th><td>Anyone with a CAN bus to look at or script</td><td>Free, MIT licence. No account, no licence key, works offline.</td></tr></tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="h-limits">
+      <h2 id="h-limits">What it is not yet</h2>
+      <ul class="limits">
+        <li>Windows only. The code is plain Python, but there is no launcher for other systems and nothing has been tried on them. Only Python 3.12 has been tested.</li>
+        <li>Only the virtual bus has been tested. Real adapters should work through python-can but have not been tried here.</li>
+        <li>Logs are tested with files Busscript wrote itself, not with files exported by other tools.</li>
+        <li>CAN and CAN FD only: no LIN, J1939 decoding, diagnostics or FlexRay.</li>
+        <li>No scripting language of its own. You script it from outside, over REST or MCP.</li>
+        <li>The plot uses one shared vertical axis; there are no measurement cursors yet.</li>
+        <li>Cyclic transmit timing has not been measured on Windows. Do not treat it as hard real-time.</li>
+      </ul>
+    </section>
+
+    <section id="faq" aria-labelledby="h-faq">
+      <h2 id="h-faq">Questions</h2>
+      <details><summary>What do I need installed?</summary><p>Windows, Python 3.11 or newer, and internet access the first time so it can fetch its libraries. You do not need Node.js: the interface is already built.</p></details>
+      <details><summary>Which CAN adapters work?</summary><p>Any interface python-can supports, such as SocketCAN, PCAN and serial-line adapters. Only the built-in virtual bus has been tested so far. Hardware that needs a vendor driver needs that driver installed.</p></details>
+      <details><summary>Is it safe to let an AI assistant send frames?</summary><p>It is your call, and the defaults assume caution. MCP is off, MCP transmit is a second switch that is off, channels are listen-only, and transmits are rate-limited. Sending onto a real vehicle bus can affect real equipment, so keep it off on a live vehicle unless you mean it.</p></details>
+      <details><summary>Can bus data trick an assistant?</summary><p>Frame contents and database names come from other devices and files, so Busscript returns them as structured data and tells the assistant to treat them as data. Sending still needs your switch.</p></details>
+      <details><summary>Does it send my data anywhere?</summary><p>No. The server listens on 127.0.0.1 only, and requests need a token that stays on your machine. This page loads nothing from other sites.</p></details>
+      <details><summary>Can I script it in a language of its own?</summary><p>Not today. You use any language that can make HTTP calls, or an MCP client.</p></details>
+    </section>
+
+    <section aria-labelledby="h-final">
+      <h2 id="h-final">Try it without hardware</h2>
+      <p class="lead">One command starts a demo bus. Then point a script at it.</p>
+      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/archive/refs/heads/main.zip">Download (zip)</a>
+    </section>
+  </main>
+
+  <footer>
+    <p>Busscript is released under the <a href="https://github.com/vihaan-k-mehta/busscript.github.io/blob/main/LICENSE">MIT licence</a>. Third-party libraries keep their own licences (python-can is LGPL-3.0). Not affiliated with any other CAN tool maker.</p>
+  </footer>
+</div>
+</body>
+</html>

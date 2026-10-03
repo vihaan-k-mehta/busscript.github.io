@@ -1,0 +1,18 @@
+VERSION ""
+
+NS_ :
+
+BS_:
+
+BU_: ECU1 ECU2
+
+BO_ 256 EngineData: 8 ECU1
+ SG_ EngineSpeed : 0|16@1+ (0.25,0) [0|16383] "rpm" ECU2
+ SG_ CoolantTemp : 16|8@1+ (1,-40) [-40|215] "degC" ECU2
+ SG_ ThrottlePos : 24|8@1+ (0.4,0) [0|100] "%" ECU2
+ SG_ Gear : 32|4@1+ (1,0) [0|15] "" ECU2
+
+BO_ 512 VehicleSpeed: 4 ECU1
+ SG_ Speed : 0|16@1+ (0.01,0) [0|300] "km/h" ECU2
+
+VAL_ 256 Gear 0 "Neutral" 1 "First" 2 "Second" 3 "Third" ;
