@@ -95,19 +95,21 @@ export function TracePane({ hex }: { hex: boolean }) {
 }
 
 /* ------------------------------------------------------------------- Data */
-export function DataPane({ running, plotted, onPlot }: { running: boolean; plotted: string[]; onPlot: (name: string, on: boolean) => void }) {
+export function DataPane({ running, plotted, onPlot, fileKey }: { running: boolean; plotted: string[]; onPlot: (name: string, on: boolean) => void; fileKey?: string }) {
   const [vals, setVals] = useState<SignalValue[]>([]);
   const [cat, setCat] = useState<CatalogueMsg[]>([]);
   const [paused, setPaused] = useState(false);
 
-  useEffect(() => { api<CatalogueMsg[]>("/api/signals").then(setCat).catch(() => {}); }, [running]);
+  const fileMode = fileKey !== undefined;
+  useEffect(() => { api<CatalogueMsg[]>(fileMode ? "/api/file/signals" : "/api/signals").then(setCat).catch(() => {}); }, [running, fileMode, fileKey]);
   useEffect(() => {
-    if (paused) return;
-    const tick = () => api<SignalValue[]>("/api/signal-values").then(setVals).catch(() => {});
+    if (paused && !fileMode) return;
+    const tick = () => api<SignalValue[]>(fileMode ? "/api/file/signal-values" : "/api/signal-values").then(setVals).catch(() => setVals([]));
     tick();
+    if (fileMode) return;                       // a file does not change, so read it once
     const t = window.setInterval(tick, 500);
     return () => window.clearInterval(t);
-  }, [paused]);
+  }, [paused, fileMode, fileKey]);
 
   const range = useMemo(() => {
     const m = new Map<string, [number | null, number | null]>();
@@ -118,13 +120,13 @@ export function DataPane({ running, plotted, onPlot }: { running: boolean; plott
   const tools = (
     <>
       <button className="tb" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}<span>{paused ? "Resume" : "Pause"}</span></button>
-      <span className="muted" style={{ marginLeft: "auto" }}>{vals.length} signals{running ? "" : " (stopped)"}</span>
+      <span className="muted" style={{ marginLeft: "auto" }}>{vals.length} signals{fileMode ? " (at the end of the file)" : running ? "" : " (stopped)"}</span>
     </>
   );
   return (
     <Pane title="Data" tools={tools}>
       {vals.length === 0 ? (
-        <div className="empty">{cat.length === 0 ? "No database loaded. Attach a DBC file on the Setup tab to see signal values." : "No decoded frames yet."}</div>
+        <div className="empty">{cat.length === 0 ? (fileMode ? "No database attached. Open a DBC file (Open file) and the signals in this recording get their names." : "No database loaded. Attach a DBC file on the Setup tab to see signal values.") : "No decoded frames yet."}</div>
       ) : (
         <table className="tbl">
           <thead><tr><th scope="col">Graph</th><th scope="col">Name</th><th scope="col">Value</th><th scope="col">Unit</th><th scope="col">Raw</th><th scope="col">Bar</th></tr></thead>
@@ -155,7 +157,7 @@ export function DataPane({ running, plotted, onPlot }: { running: boolean; plott
 /* ---------------------------------------------------------------- Graphic */
 function css(name: string) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
-export function GraphicPane({ plotted, onPlot }: { plotted: string[]; onPlot: (name: string, on: boolean) => void }) {
+export function GraphicPane({ plotted, onPlot, fileKey }: { plotted: string[]; onPlot: (name: string, on: boolean) => void; fileKey?: string }) {
   const el = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
   const [paused, setPaused] = useState(false);
@@ -164,23 +166,27 @@ export function GraphicPane({ plotted, onPlot }: { plotted: string[]; onPlot: (n
   const [data, setData] = useState<number[][]>([[]]);
   const [adding, setAdding] = useState("");
 
-  useEffect(() => { api<CatalogueMsg[]>("/api/signals").then(setCat).catch(() => {}); }, []);
-  useEffect(() => { api("/api/watch", "PUT", { signals: plotted }).catch(() => {}); }, [plotted]);
+  const fileMode = fileKey !== undefined;
+  useEffect(() => { api<CatalogueMsg[]>(fileMode ? "/api/file/signals" : "/api/signals").then(setCat).catch(() => {}); }, [fileMode, fileKey]);
+  useEffect(() => { if (!fileMode) api("/api/watch", "PUT", { signals: plotted }).catch(() => {}); }, [plotted, fileMode]);
 
   useEffect(() => {
-    if (paused || plotted.length === 0) return;
+    if ((paused && !fileMode) || plotted.length === 0) return;
     const tick = async () => {
       try {
-        const series = await Promise.all(plotted.map((n) => api<[number, number][]>(`/api/signals/history?name=${encodeURIComponent(n)}`)));
+        const url = (n: string) => fileMode ? `/api/file/series?name=${encodeURIComponent(n)}` : `/api/signals/history?name=${encodeURIComponent(n)}`;
+        // a signal that is not in this file simply plots as empty
+        const series = await Promise.all(plotted.map((n) => api<[number, number][]>(url(n)).catch(() => [] as [number, number][])));
         const xs = Array.from(new Set(series.flatMap((s) => s.map((p) => p[0])))).sort((a, b) => a - b);
         const cols = series.map((s) => { const m = new Map(s); return xs.map((x) => (m.has(x) ? (m.get(x) as number) : null)); });
         setData([xs, ...cols] as unknown as number[][]);
       } catch { /* keep last */ }
     };
     tick();
+    if (fileMode) return;                       // the whole recording is plotted once
     const t = window.setInterval(tick, 500);
     return () => window.clearInterval(t);
-  }, [plotted, paused]);
+  }, [plotted, paused, fileMode, fileKey]);
 
   const colors = useMemo(() => [1, 2, 3, 4, 5, 6].map((i) => css(`--series-${i}`)), []);
   const dashes = [[], [6, 3], [2, 3], [8, 3, 2, 3], [], [6, 3]];
@@ -215,7 +221,7 @@ export function GraphicPane({ plotted, onPlot }: { plotted: string[]; onPlot: (n
         {all.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
       <button className="tb" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}<span>{paused ? "Resume" : "Pause"}</span></button>
-      <span className="muted" style={{ marginLeft: "auto" }}>drag to zoom · double-click to reset</span>
+      <span className="muted" style={{ marginLeft: "auto" }}>{fileMode ? "whole recording · " : ""}drag to zoom · double-click to reset</span>
     </>
   );
   return (

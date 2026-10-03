@@ -313,3 +313,10 @@ def test_logs_keep_extended_identifiers(tmp_path, fmt):
     got = {(m.arbitration_id, bool(m.is_extended_id)) for m in msgs}
     assert got == {(0x14FF2321, True), (0x123, False)}
     assert all(m.arbitration_id <= 0x7FF for m in msgs if not m.is_extended_id)
+
+
+def test_state_reports_demo_flag():
+    b = Bus()
+    assert b.state()["demo"] is False        # a real session is never labelled demo
+    b.demo = True
+    assert b.state()["demo"] is True

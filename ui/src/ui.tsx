@@ -53,10 +53,14 @@ export function Field({ label, children, error }: { label: string; children: Rea
 }
 
 export function Toast({ msg, kind, onDone }: { msg: string; kind: "info" | "error"; onDone: () => void }) {
+  // keep the latest callback in a ref: the parent re-renders many times a second while data streams in, and a
+  // callback in the effect's dependencies would restart the timer every time, so the message would never leave
+  const done = useRef(onDone);
+  done.current = onDone;
   useEffect(() => {
-    const t = window.setTimeout(onDone, kind === "error" ? 7000 : 3000);
+    const t = window.setTimeout(() => done.current(), kind === "error" ? 7000 : 3000);
     return () => window.clearTimeout(t);
-  }, [msg, kind, onDone]);
+  }, [msg, kind]);
   return <div className={`toast ${kind}`} role={kind === "error" ? "alert" : "status"}>{msg}</div>;
 }
 

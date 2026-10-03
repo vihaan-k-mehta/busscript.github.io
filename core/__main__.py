@@ -38,11 +38,13 @@ def main() -> None:
         bus.set_channel(cfg)
         bus.load_database("demo", str(SAMPLE_DBC))
         start_demo_traffic("demo0")
+        bus.demo = True
 
     if args.mcp_stdio:
+        from .files import FileSession
         from .mcp_server import McpPolicy, build_mcp
         store.set_setting("mcp.enabled", "true")
-        build_mcp(bus, store, McpPolicy(store)).run("stdio")
+        build_mcp(bus, store, McpPolicy(store), FileSession(bus, store.data_dir)).run("stdio")
         return
 
     token = store.token()

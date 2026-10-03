@@ -21,6 +21,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from .bus import Bus, BusError
 from .mcp_server import ALL_TOOLS, McpPolicy, build_mcp
 from .models import ChannelConfig, FilterRule, Frame
+from .files import MAX_UPLOAD, FileSession, kind_of, safe_name, supported_text, unique_path
+from .script import TEMPLATES, ScriptError, ScriptLibrary, ScriptRunner, parse as parse_script
 from .store import Store
 
 UI_DIST = Path(__file__).resolve().parents[1] / "ui" / "dist"
@@ -82,6 +84,15 @@ class ReplayIn(BaseModel):
     loop: bool = False
 
 
+class OpenIn(BaseModel):
+    name: str
+    channel: Optional[str] = None
+
+
+class ScriptIn(BaseModel):
+    text: str
+
+
 class WatchIn(BaseModel):
     signals: list[str]
 
@@ -136,17 +147,27 @@ class GuardMiddleware:
 
 def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
     policy = McpPolicy(store)
-    mcp = build_mcp(bus, store, policy)
+    fsession = FileSession(bus, store.data_dir)
+    mcp = build_mcp(bus, store, policy, fsession)
     mcp_app = mcp.streamable_http_app()
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         async with mcp_app.router.lifespan_context(mcp_app):
             yield
+        runner.stop()
         bus.stop()
 
     app = FastAPI(title="Busscript", lifespan=lifespan)
     app.add_middleware(GuardMiddleware, token=token)
+
+    runner = ScriptRunner(bus, store.data_dir)
+    library = ScriptLibrary(store.data_dir)
+    app.state.scripts_dir = library.dir
+
+    @app.exception_handler(ScriptError)
+    async def script_error(_: Request, e: ScriptError):
+        return JSONResponse({"detail": str(e), "line": e.line}, status_code=400)
 
     @app.exception_handler(BusError)
     async def bus_error(_: Request, e: BusError):
@@ -188,6 +209,7 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
 
     @app.post("/api/measurement/start")
     def start():
+        fsession.close()
         return bus.start()
 
     @app.post("/api/measurement/stop")
@@ -231,8 +253,9 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
     @app.get("/api/frames/decode")
     def decode(channel: str, id: int, data: str, ext: bool = False):
         d = _hex(data)
-        return bus.decode_frame(Frame(ts=0, channel=channel, can_id=id, ext=ext, fd=False,
-                                      direction="rx", dlc=len(d), data=d))
+        f = Frame(ts=0, channel=channel, can_id=id, ext=ext, fd=False, direction="rx", dlc=len(d), data=d)
+        m = fsession._message(f)          # tries this channel first, then any channel that has a database
+        return fsession._decode(f, m) if m is not None else []
 
     @app.get("/api/statistics")
     def statistics():
@@ -290,6 +313,128 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
     @app.post("/api/replay/stop")
     def replay_stop():
         bus.stop_replay()
+        return {"ok": True}
+
+    # --------------------------------------------------------------- files
+    @app.get("/api/files")
+    def files_list():
+        return {"stored": fsession.stored_files(), "supported": supported_text(), "open": fsession.summary()}
+
+    @app.put("/api/files/{filename}")
+    async def files_upload(filename: str, request: Request):
+        name = safe_name(filename)
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_UPLOAD:
+            raise BusError(f"That file is larger than {MAX_UPLOAD // (1024 * 1024)} MB, which is the limit.")
+        dest = unique_path(fsession.dir, name)
+        size = 0
+        try:
+            with open(dest, "wb") as f:
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > MAX_UPLOAD:
+                        raise BusError(f"That file is larger than {MAX_UPLOAD // (1024 * 1024)} MB, which is the limit.")
+                    f.write(chunk)
+        except BaseException:
+            dest.unlink(missing_ok=True)
+            raise
+        return {"name": dest.name, "size": size, "kind": kind_of(dest.name)}
+
+    @app.post("/api/files/open")
+    def files_open(o: OpenIn):
+        path = fsession.stored_path(o.name)
+        kind = kind_of(path.name)
+        if kind == "database":
+            channel = o.channel or next(iter(bus.channels), None)
+            created = False
+            if channel is None:   # a database with no channel yet: make a quiet one to hold it
+                cfg = bus.set_channel(ChannelConfig(name="file", interface="virtual", channel="file", listen_only=True))
+                store.save_channel(cfg)
+                channel, created = cfg.name, True
+            res = bus.load_database(channel, str(path))
+            store.add_database(channel, str(path))
+            return {"kind": "database", "channel": channel, "created_channel": created, **res}
+        return {"kind": "log", **fsession.open(path, path.name)}
+
+    @app.delete("/api/files/stored/{name}")
+    def files_delete(name: str):
+        fsession.stored_path(name).unlink(missing_ok=True)
+        return {"ok": True}
+
+    @app.get("/api/file")
+    def file_summary():
+        return fsession.summary()
+
+    @app.delete("/api/file")
+    def file_close():
+        fsession.close()
+        return {"ok": True}
+
+    @app.get("/api/file/frames")
+    def file_frames(offset: int = 0, limit: int = 200, id: Optional[int] = None, ext: bool = False):
+        return {"total": fsession.count(id, ext), "frames": fsession.frame_dicts(offset, limit, id, ext)}
+
+    @app.get("/api/file/seek")
+    def file_seek(t: float, id: Optional[int] = None, ext: bool = False):
+        return {"index": fsession.seek(t, id, ext)}
+
+    @app.get("/api/file/overview")
+    def file_overview():
+        return fsession.overview()
+
+    @app.get("/api/file/signal-values")
+    def file_signal_values():
+        return fsession.signal_values()
+
+    @app.get("/api/file/signals")
+    def file_signals():
+        return fsession.catalogue()
+
+    @app.get("/api/file/series")
+    def file_series(name: str, max_points: int = 5000):
+        return fsession.series(name, max_points)
+
+    # ------------------------------------------------------------- scripts
+    @app.get("/api/scripts/templates")
+    def script_templates():
+        return TEMPLATES
+
+    @app.post("/api/scripts/check")
+    def script_check(sc: ScriptIn):
+        try:
+            steps = parse_script(sc.text)
+        except ScriptError as e:
+            return {"ok": False, "line": e.line, "message": str(e)}
+        return {"ok": True, "steps": len(steps)}
+
+    @app.post("/api/scripts/run")
+    def script_run(sc: ScriptIn):
+        return runner.start(sc.text)
+
+    @app.post("/api/scripts/stop")
+    def script_stop():
+        return runner.stop()
+
+    @app.get("/api/scripts/status")
+    def script_status():
+        return runner.state()
+
+    @app.get("/api/scripts/saved")
+    def script_saved():
+        return library.names()
+
+    @app.get("/api/scripts/saved/{name}")
+    def script_get(name: str):
+        return {"name": name, "text": library.get(name)}
+
+    @app.put("/api/scripts/saved/{name}")
+    def script_put(name: str, sc: ScriptIn):
+        library.save(name, sc.text)
+        return {"ok": True}
+
+    @app.delete("/api/scripts/saved/{name}")
+    def script_delete(name: str):
+        library.delete(name)
         return {"ok": True}
 
     # ------------------------------------------------------ settings, MCP

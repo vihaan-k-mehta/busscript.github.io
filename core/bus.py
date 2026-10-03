@@ -64,6 +64,7 @@ class Bus:
         self._replay_stop = threading.Event()
         self._replay_info: Optional[dict] = None
         self.dropped = 0
+        self.demo = False  # True when running on the built-in synthetic traffic
 
     # ------------------------------------------------------------------ config
     def set_channel(self, cfg: ChannelConfig) -> ChannelConfig:
@@ -238,6 +239,7 @@ class Bus:
 
     def state(self) -> dict:
         return {
+            "demo": self.demo,
             "running": self.running,
             "elapsed": round(time.time() - self._t0, 3) if self.running else 0.0,
             "channels": len(self.channels),
@@ -369,6 +371,16 @@ class Bus:
                 rows.append({**r, "channel": ch, "ts": round(f.ts, 3)})
         rows.sort(key=lambda r: (r["message"], r["signal"]))
         return rows
+
+    def current_signal(self, name: str):
+        """Latest decoded value of 'Message.Signal', or None if it has not been seen yet."""
+        msg, _, sig = name.partition(".")
+        for f in list(self._latest.values()):
+            if f.name == msg:
+                for r in self.decode_frame(f):
+                    if r["signal"] == sig:
+                        return r["value"]
+        return None
 
     def watch(self, names: list[str]) -> None:
         with self._lock:

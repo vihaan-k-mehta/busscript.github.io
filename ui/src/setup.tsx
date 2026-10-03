@@ -52,7 +52,7 @@ function ChannelDialog({ open, initial, onClose, onSaved, notify }: { open: bool
   );
 }
 
-export function SetupPage({ channels, state, refresh, notify }: { channels: Channel[]; state: BusState | null; refresh: () => void; notify: Notify }) {
+export function SetupPage({ channels, state, refresh, notify, onImport }: { channels: Channel[]; state: BusState | null; refresh: () => void; notify: Notify; onImport: (files: File[]) => void }) {
   const [dlg, setDlg] = useState<{ open: boolean; ch?: Channel }>({ open: false });
   const running = !!state?.running;
   const act = useCallback(async (fn: () => Promise<unknown>, ok?: string) => {
@@ -86,7 +86,7 @@ export function SetupPage({ channels, state, refresh, notify }: { channels: Chan
         </div>
       </section>
 
-      <DatabaseCard channels={channels} act={act} />
+      <DatabaseCard channels={channels} act={act} onImport={onImport} />
       <FilterCard channels={channels} act={act} />
       <TransmitCard channels={channels} state={state} act={act} />
       <LoggingCard state={state} act={act} />
@@ -99,7 +99,7 @@ export function SetupPage({ channels, state, refresh, notify }: { channels: Chan
 type Act = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
 
 /* --------------------------------------------------------------- databases */
-function DatabaseCard({ channels, act }: { channels: Channel[]; act: Act }) {
+function DatabaseCard({ channels, act, onImport }: { channels: Channel[]; act: Act; onImport: (files: File[]) => void }) {
   const [path, setPath] = useState("");
   const [ch, setCh] = useState("");
   const target = ch || channels[0]?.name || "";
@@ -111,8 +111,13 @@ function DatabaseCard({ channels, act }: { channels: Channel[]; act: Act }) {
           channels.flatMap((c) => c.databases.map((d) => (
             <div key={`${c.name}${d}`} className="row"><span><b>{c.name}</b> {d}</span>
               <button className="btn fixed" onClick={() => act(() => api(`/api/databases/${c.name}`, "DELETE"))}>Detach</button></div>)))}
+        <label className="btn filebtn">
+          Choose a database file…
+          <input type="file" accept=".dbc,.kcd,.sym,.arxml,.cdd" className="sr-only" aria-label="Choose a database file"
+            onChange={(e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; if (fs.length) onImport(fs); }} />
+        </label>
         <div className="row">
-          <Field label="DBC file path"><input type="text" value={path} placeholder="C:\path\to\file.dbc" onChange={(e) => setPath(e.target.value)} /></Field>
+          <Field label="Or type the DBC file path"><input type="text" value={path} placeholder="C:\path\to\file.dbc" onChange={(e) => setPath(e.target.value)} /></Field>
           <Field label="Channel"><select value={target} onChange={(e) => setCh(e.target.value)}>{channels.map((c) => <option key={c.name}>{c.name}</option>)}</select></Field>
           <button className="btn fixed" disabled={!path || !target} onClick={() => act(async () => { await api("/api/databases", "POST", { channel: target, path }); setPath(""); }, "Database loaded")}>Attach</button>
         </div>

@@ -19,12 +19,14 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from .bus import Bus, BusError
+from .files import FileSession, kind_of
 from .store import Store
 
 ALL_TOOLS = [
     "list_channels", "load_dbc", "start_measurement", "stop_measurement", "get_recent_frames",
     "read_signal", "get_statistics", "start_logging", "stop_logging", "start_replay", "stop_replay",
     "send_frame", "send_signal",
+    "list_files", "open_file", "file_overview", "file_signal",
 ]
 DB_SUFFIXES = {".dbc", ".kcd", ".sym", ".arxml", ".cdd"}
 MCP_MAX_FRAMES = 200
@@ -84,7 +86,7 @@ class McpPolicy:
                               "ok": ok, "detail": detail[:300]})
 
 
-def build_mcp(bus: Bus, store: Store, policy: McpPolicy) -> MCPServer:
+def build_mcp(bus: Bus, store: Store, policy: McpPolicy, files: FileSession) -> MCPServer:
     mcp = MCPServer("busscript", instructions=INSTRUCTIONS)
 
     def guarded(name: str, args: dict, fn: Callable[[], Any]) -> Any:
@@ -202,6 +204,50 @@ def build_mcp(bus: Bus, store: Store, policy: McpPolicy) -> MCPServer:
                 raise BusError(f"rate limit: at most {SEND_PER_SECOND} frames per second from MCP")
             return bus.send_signals(channel, message, signals)
         return guarded("send_signal", {"channel": channel, "message": message, "signals": signals}, run)
+
+    @mcp.tool()
+    def list_files() -> dict:
+        """List recordings and database files in the uploads folder, and logs recorded by Busscript."""
+        def run():
+            logs = [{"name": p.name, "size": p.stat().st_size} for p in sorted((store.data_dir / "logs").glob("*"))
+                    if p.is_file() and kind_of(p.name) == "log"]
+            return {"uploads": files.stored_files(), "logs": logs, "open": files.summary()}
+        return guarded("list_files", {}, run)
+
+    @mcp.tool()
+    def open_file(name: str) -> dict:
+        """Open a recording (ASC, BLF, MF4, candump .log, PEAK .trc, CSV, SQLite) from the uploads or logs folder for analysis."""
+        def run():
+            try:
+                path = files.stored_path(name)
+            except BusError:
+                path = (store.data_dir / "logs" / Path(name).name).resolve()
+                if path.parent != (store.data_dir / "logs").resolve() or not path.is_file():
+                    raise BusError("No such file in the uploads or logs folder. Use list_files to see what is there.")
+            if kind_of(path.name) != "log":
+                raise BusError("That is not a recording. Database files are attached from the app (Open file).")
+            return files.open(path, path.name)
+        return guarded("open_file", {"name": name}, run)
+
+    @mcp.tool()
+    def file_overview(max_messages: int = 100) -> dict:
+        """Summary of the open recording and a table of its messages (id, name, frame count, rate). Names need a database attached in the app."""
+        def run():
+            rows = files.overview()
+            return {"file": files.summary(), "messages": rows[:max(1, min(max_messages, 200))], "total_messages": len(rows)}
+        return guarded("file_overview", {"max_messages": max_messages}, run)
+
+    @mcp.tool()
+    def file_signal(name: str, max_points: int = 200) -> dict:
+        """One signal ('Message.Signal') across the whole open recording: minimum, maximum, mean and up to 500 [seconds, value] points."""
+        def run():
+            pts = files.series(name, 20000)
+            vals = [v for _, v in pts]
+            keep = max(2, min(max_points, 500))
+            step = max(1, len(pts) // keep)
+            return {"name": name, "samples": len(pts), "min": min(vals), "max": max(vals), "mean": round(sum(vals) / len(vals), 6),
+                    "first": pts[0], "last": pts[-1], "points": pts[::step][:keep]}
+        return guarded("file_signal", {"name": name, "max_points": max_points}, run)
 
     @mcp.resource("can://signals")
     def signals_resource() -> str:
