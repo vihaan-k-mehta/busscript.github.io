@@ -21,15 +21,17 @@ def main() -> None:
     work = ROOT / "build"
     shutil.rmtree(work, ignore_errors=True)
     cmd = [
-        sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noconsole", "--name", "Busscript",
+        sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noconsole", "--name", "Busscript", "--icon", str(ROOT / "assets" / "busscript.ico"),
         "--distpath", str(ROOT / "dist"), "--workpath", str(work), "--specpath", str(work),
         "--add-data", f"{ROOT / 'ui' / 'dist'}{SEP}ui/dist",
         "--add-data", f"{ROOT / 'samples'}{SEP}samples",
         "--add-data", f"{ROOT / 'core' / 'schema.sql'}{SEP}core",
+        "--add-data", f"{ROOT / 'assets'}{SEP}assets",
+        "--collect-all", "webview", "--collect-all", "clr_loader", "--collect-all", "pythonnet",
         "--collect-submodules", "can", "--collect-submodules", "uvicorn", "--collect-submodules", "mcp.server", "--collect-submodules", "mcp.shared", "--hidden-import", "mcp.types",
         "--collect-all", "asammdf", "--collect-all", "cantools",
         "--copy-metadata", "python-can", "--copy-metadata", "mcp", "--copy-metadata", "fastapi", "--copy-metadata", "uvicorn",
-        "--copy-metadata", "cantools", "--copy-metadata", "asammdf", "--copy-metadata", "pyserial",
+        "--copy-metadata", "cantools", "--copy-metadata", "asammdf", "--copy-metadata", "pyserial", "--copy-metadata", "pywebview",
         "--hidden-import", "serial", "--hidden-import", "serial.tools.list_ports",
         "--exclude-module", "matplotlib", "--exclude-module", "tkinter", "--exclude-module", "PyQt5", "--exclude-module", "PySide6",
         "--exclude-module", "IPython", "--exclude-module", "pytest",

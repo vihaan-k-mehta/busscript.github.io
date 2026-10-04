@@ -3,3 +3,4 @@ cantools==44.1.0
 fastapi==0.142.2
 uvicorn[standard]==0.54.0
 mcp==2.3.0
+pywebview==6.2.1

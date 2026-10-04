@@ -139,7 +139,7 @@ export function AnalyzePage({ file, notify }: { file: FileSummary | null; notify
                   <tr key={s.name}>
                     <td className="wrap">{s.name}</td><td className="mono">{(s.size / 1024).toFixed(0)} KB</td>
                     <td style={{ textAlign: "right" }}>
-                      <button className="btn" onClick={() => download(s.name).catch((e) => notify((e as Error).message, "error"))}><Download size={13} /> Download</button>{" "}
+                      <button className="btn" onClick={() => download(s.name).then(() => notify(`Downloaded ${s.name}. Look in your Downloads folder.`)).catch((e) => notify((e as Error).message, "error"))}><Download size={13} /> Download</button>{" "}
                       <button className="btn danger" aria-label={`Delete ${s.name}`} onClick={() => api(`/api/exports/${encodeURIComponent(s.name)}`, "DELETE").then(loadSaved)}><Trash2 size={13} /></button>
                     </td>
                   </tr>

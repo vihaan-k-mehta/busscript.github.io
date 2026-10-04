@@ -49,6 +49,29 @@ def open_app_window(url: str, profile: Path, on_closed: Callable[[], None]) -> b
     return True
 
 
+ICON = Path(__file__).resolve().parents[1] / "assets" / "busscript.ico"
+
+
+def run_native_window(url: str, storage: Path, debug_port: Optional[int] = None) -> bool:
+    """Show Busscript in a real window of its own (the Windows WebView2 engine embedded in this program, so there is
+    no browser around it). Blocks until the window is closed and returns True. Returns False without opening anything
+    if the window cannot be made (no pywebview, or no WebView2 on this PC)."""
+    try:
+        import webview
+    except Exception:
+        return False
+    storage.mkdir(parents=True, exist_ok=True)
+    webview.settings["ALLOW_DOWNLOADS"] = True            # the Analyze page saves files
+    if debug_port:
+        webview.settings["REMOTE_DEBUGGING_PORT"] = debug_port   # lets the tests drive this very window
+    try:
+        webview.create_window("Busscript", url, width=1440, height=900, min_size=(900, 560), text_select=True)
+        webview.start(private_mode=False, storage_path=str(storage), icon=str(ICON) if ICON.exists() else None)
+    except Exception:
+        return False
+    return True
+
+
 def free_port(preferred: int, tries: int = 20) -> int:
     """The preferred port, or the next free one (a second copy of Busscript may already be running)."""
     for p in range(preferred, preferred + tries):

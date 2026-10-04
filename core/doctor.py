@@ -18,6 +18,7 @@ LIBRARIES = [  # (package, what it does, needed to start?)
     ("mcp", "Lets an AI assistant use Busscript", True),
     ("asammdf", "Opens MF4 (MDF4) recordings", True),
     ("pyserial", "Serial-port adapters (SLCAN, CANable, Arduino)", False),
+    ("pywebview", "Shows Busscript in a window of its own (otherwise it uses Edge or Chrome)", False),
 ]
 
 # adapter family -> (python-can interface, driver file names to look for, where to get it)
@@ -33,7 +34,7 @@ DRIVERS = [
 ]
 
 
-_MODULE = {"python-can": "can", "pyserial": "serial"}
+_MODULE = {"python-can": "can", "pyserial": "serial", "pywebview": "webview"}
 
 
 def _version(pkg: str) -> str | None:

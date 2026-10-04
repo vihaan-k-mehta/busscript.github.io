@@ -18,7 +18,7 @@ To use your own adapter press **Use my own adapter** in the demo banner and add 
 
 Build the exe yourself with `pip install pyinstaller` then `python scripts/make_exe.py` (needs the built UI). Node.js is not needed: the UI is already built (`ui/dist`).
 
-Busscript opens in its own window (Microsoft Edge or Chrome in app mode, with no address bar or tabs and its own taskbar icon). Closing that window quits Busscript. If you would rather use your normal browser, run `start.bat --browser`. The link printed in the console contains your access token.
+Busscript opens in a real window of its own: the Windows WebView2 engine (the same one Edge uses, already on Windows 11 and most Windows 10 PCs) is built into the program, so there is no browser, address bar or tabs around it, and the window has Busscript's own icon. Closing the window quits Busscript. If WebView2 is missing it falls back to Edge or Chrome in app mode. For your normal browser instead, run `start.bat --browser`. The link printed in the console contains your access token.
 
 The first run downloads about 150 MB of libraries, mostly the ones that read MF4 files, so give it a few minutes.
 

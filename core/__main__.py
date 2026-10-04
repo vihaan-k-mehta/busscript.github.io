@@ -13,7 +13,7 @@ from .demo import start_demo_traffic
 from .models import ChannelConfig
 from .server import create_app
 from .store import Store
-from .window import free_port, open_app_window
+from .window import free_port, open_app_window, run_native_window
 
 SAMPLE_DBC = Path(__file__).resolve().parents[1] / "samples" / "demo.dbc"
 
@@ -24,7 +24,8 @@ def main() -> None:
     ap.add_argument("--data-dir", type=Path, default=None)
     ap.add_argument("--demo", action="store_true", help="virtual bus with synthetic traffic and the sample DBC")
     ap.add_argument("--live", action="store_true", help="never start the demo; use only your own channels")
-    ap.add_argument("--browser", action="store_true", help="open in your normal browser instead of an app window")
+    ap.add_argument("--browser", action="store_true", help="open in your normal browser instead of a window of its own")
+    ap.add_argument("--debug-port", type=int, default=None, help=argparse.SUPPRESS)
     ap.add_argument("--no-browser", action="store_true", help="do not open any window")
     ap.add_argument("--mcp-stdio", action="store_true", help="serve MCP over stdio instead of the web app")
     args = ap.parse_args()
@@ -62,17 +63,33 @@ def main() -> None:
     print(f"MCP endpoint: http://127.0.0.1:{port}/mcp  (Authorization: Bearer <token>; enable in Settings)")
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
 
-    def show() -> None:      # wait until the server answers, so the window never opens on an error page
-        for _ in range(100):
+    def wait_started() -> bool:      # the window must never open on an error page
+        for _ in range(300):
             if server.started:
-                break
+                return True
             time.sleep(0.1)
-        if args.browser or not open_app_window(url, store.data_dir / "window", lambda: setattr(server, "should_exit", True)):
-            webbrowser.open(url)
+        return False
 
-    if not args.no_browser:
-        threading.Thread(target=show, daemon=True, name="open-window").start()
-    server.run()
+    if args.no_browser:
+        server.run()
+    elif args.browser:
+        threading.Thread(target=lambda: wait_started() and webbrowser.open(url), daemon=True, name="open-browser").start()
+        server.run()
+    else:
+        # The server runs in the background while this thread shows the window; closing the window ends the program.
+        runner = threading.Thread(target=server.run, daemon=True, name="server")
+        runner.start()
+        if wait_started():
+            if not run_native_window(url, store.data_dir / "window", args.debug_port):
+                # No embedded engine on this PC: use Edge or Chrome as an app window, else the normal browser.
+                gone = threading.Event()
+                if open_app_window(url, store.data_dir / "window", gone.set):
+                    gone.wait()
+                else:
+                    webbrowser.open(url)
+                    runner.join()
+        server.should_exit = True
+        runner.join(timeout=5)
     bus.stop()
 
 

@@ -38,7 +38,7 @@ if not exist ".venv\Scripts\python.exe" (
   %PY% -m venv .venv || goto :fail
 )
 
-".venv\Scripts\python.exe" -c "import can, cantools, fastapi, uvicorn, mcp, asammdf, serial" >nul 2>nul
+".venv\Scripts\python.exe" -c "import can, cantools, fastapi, uvicorn, mcp, asammdf, serial, webview" >nul 2>nul
 if errorlevel 1 (
   echo Installing the libraries Busscript needs. This takes a few minutes and needs internet, once.
   ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r requirements.txt || goto :fail
