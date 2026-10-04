@@ -6,7 +6,7 @@ A local CAN bus tool you can script: REST and an MCP server alongside a live UI.
 
 Busscript is for **Windows**. You need **Python 3.11 or newer** from python.org (tick "Add python.exe to PATH"). Tested on Windows 11 with Python 3.12.
 
-**Easiest:** download `Busscript.exe` from the Releases page and double-click it. No Python needed. Windows may warn that the publisher is unknown because the program is not code-signed (More info, then Run anyway).
+**Easiest:** download `Busscript.exe` from the website and double-click it. No Python needed. Windows may warn that the publisher is unknown because the program is not code-signed (More info, then Run anyway).
 
 **From source (for developers):** the steps below. They need Python.
 
