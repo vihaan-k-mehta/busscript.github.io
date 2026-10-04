@@ -322,3 +322,27 @@ def test_other_text_files_are_refused_kindly(tmp_path):
     p.write_text("shopping list\neggs\n")
     with pytest.raises(BusError, match="not a candump log"):
         read_log(p, "notes.txt", lambda n: "CAN1")
+
+
+def test_csv_saved_by_busscript_opens_again(tmp_path):
+    """Found with real data: Busscript could not reopen its own CSV export."""
+    from core.export import write_frames
+    from core.files import read_log
+    from core.models import Frame
+    frames = [Frame(ts=0.0, channel="CAN1", can_id=0x100, ext=False, fd=False, direction="rx", dlc=8, data=bytes(range(8))),
+              Frame(ts=0.5, channel="CAN2", can_id=0x18F00400, ext=True, fd=False, direction="tx", dlc=2, data=b"\xAB\xCD")]
+    p = tmp_path / "back.csv"
+    write_frames(frames, p, "csv")
+    v = read_log(p, "back.csv", lambda n: f"CAN{n}" if n else "CAN1")
+    assert len(v.frames) == 2
+    assert v.frames[1].can_id == 0x18F00400 and v.frames[1].ext and v.frames[1].direction == "tx"
+    assert v.frames[1].data == b"\xAB\xCD" and v.frames[1].channel == "CAN2" and abs(v.frames[1].ts - 0.5) < 1e-6
+
+
+def test_csv_without_a_time_column_is_explained(tmp_path):
+    from core.bus import BusError
+    from core.files import read_log
+    p = tmp_path / "notime.csv"
+    p.write_text("ID,Data Bytes\n00000260,00 00 00 00 00 00 00 6A\n")
+    with pytest.raises(BusError, match="no time column"):
+        read_log(p, "notime.csv", lambda n: "CAN1")

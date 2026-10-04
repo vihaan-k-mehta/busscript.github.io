@@ -52,10 +52,39 @@ def open_app_window(url: str, profile: Path, on_closed: Callable[[], None]) -> b
 ICON = Path(__file__).resolve().parents[1] / "assets" / "busscript.ico"
 
 
+PANES = {"trace": "Trace", "stat": "Bus statistic", "data": "Data", "write": "Write", "graphic": "Graphic"}
+_popouts: dict = {}                 # pane id -> its window (module level so the JavaScript bridge does not expose it)
+
+
+class _Bridge:
+    """What the page may ask the program to do: open a pane in a real window of its own, or close that window again."""
+
+    def __init__(self, base: str) -> None:
+        self._base = base
+
+    def pop_out(self, pane: str, x: int, y: int, w: int, h: int) -> bool:
+        import webview
+        if pane not in PANES or pane in _popouts:
+            return False
+        win = webview.create_window(f"Busscript - {PANES[pane]}", f"{self._base}/?pane={pane}", js_api=self,
+                                    x=int(x), y=int(y), width=int(w), height=int(h), min_size=(360, 240), text_select=True)
+        _popouts[pane] = win
+        win.events.closed += lambda *_: _popouts.pop(pane, None)
+        return True
+
+    def close_popout(self, pane: str) -> bool:
+        win = _popouts.pop(pane, None)
+        if win is None:
+            return False
+        win.destroy()
+        return True
+
+
 def run_native_window(url: str, storage: Path, debug_port: Optional[int] = None) -> bool:
     """Show Busscript in a real window of its own (the Windows WebView2 engine embedded in this program, so there is
     no browser around it). Blocks until the window is closed and returns True. Returns False without opening anything
-    if the window cannot be made (no pywebview, or no WebView2 on this PC)."""
+    if the window cannot be made (no pywebview, or no WebView2 on this PC). Panes dragged out of the window open as
+    more windows of the same kind; closing the main window closes them too."""
     try:
         import webview
     except Exception:
@@ -65,7 +94,18 @@ def run_native_window(url: str, storage: Path, debug_port: Optional[int] = None)
     if debug_port:
         webview.settings["REMOTE_DEBUGGING_PORT"] = debug_port   # lets the tests drive this very window
     try:
-        webview.create_window("Busscript", url, width=1440, height=900, min_size=(900, 560), text_select=True)
+        base = url.split("?", 1)[0].rstrip("/")
+        main = webview.create_window("Busscript", url, width=1440, height=900, min_size=(900, 560), text_select=True,
+                                     js_api=_Bridge(base))
+
+        def closing() -> None:                              # the main window going away ends the whole program
+            for w in list(_popouts.values()):
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
+            _popouts.clear()
+        main.events.closed += closing
         webview.start(private_mode=False, storage_path=str(storage), icon=str(ICON) if ICON.exists() else None)
     except Exception:
         return False

@@ -10,7 +10,8 @@ import { DiagnosticsPage } from "./diag";
 import { AnalyzePage } from "./analyze";
 import { DesignPage } from "./design";
 import { Toast, type Notify } from "./ui";
-import { Cell, PANE_IDS, PANE_NAMES, PaneContext, Splitter, ViewMenu, useLayout, type PaneId } from "./layout";
+import { Cell, PANE_IDS, PANE_NAMES, PaneContext, Splitter, ViewMenu, useLayout, type PaneControls, type PaneId } from "./layout";
+import { DragGhost, lineChannel, useHeaderDrag, usePopped, useShared } from "./dock";
 import { BusyOverlay, DropOverlay, OpenFileDialog, describe, importFiles, type Busy } from "./openfile";
 import { FileInfoPane, FileTracePane } from "./filepane";
 
@@ -18,10 +19,10 @@ export function App() {
   const lv = useLive();
   const [route, setRoute] = useState(location.hash);
   const [tab, setTab] = useState<"Setup" | "Measurement" | "Scripts" | "Diagnostics" | "Analyze">("Measurement");
-  const [hex, setHex] = useState(true);
+  const [hex, setHex] = useShared<boolean>("busscript-hex", true);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [state, setState] = useState<BusState | null>(null);
-  const [plotted, setPlotted] = useState<string[]>([]);
+  const [plotted, setPlotted] = useShared<string[]>("busscript-plotted", []);
   const [lines, setLines] = useState<LogLine[]>([]);
   const [toast, setToast] = useState<{ msg: string; kind: "info" | "error" } | null>(null);
   const [mcpOpen, setMcpOpen] = useState(false);
@@ -32,7 +33,12 @@ export function App() {
   const [busy, setBusy] = useState<Busy | null>(null);
   const [openDlg, setOpenDlg] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const { sizes, set, resetSizes, reset, isDefault, order, hidden, controls, setVisible } = useLayout();
+  const { sizes, set, resetSizes, reset, isDefault, order, hidden, controls: baseControls, setVisible } = useLayout();
+  const { popped, popOut, dockBack } = usePopped();
+  const drag = useHeaderDrag(baseControls.swap, popOut);
+  const controls: PaneControls = { ...baseControls, drag, popOut, dockBack };
+  const resetAll = () => { reset(); popped.forEach(dockBack); };         // panes in their own windows come back too
+  const nothingMoved = isDefault && popped.length === 0;
   const rootRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const botRef = useRef<HTMLDivElement>(null);
@@ -45,8 +51,11 @@ export function App() {
     return () => window.removeEventListener("hashchange", on);
   }, []);
 
-  const write = useCallback((source: string, text: string, level: LogLine["level"] = "info") =>
-    setLines((l) => [...l.slice(-499), { ts: Date.now(), source, level, text }]), []);
+  const write = useCallback((source: string, text: string, level: LogLine["level"] = "info") => {
+    const line = { ts: Date.now(), source, level, text };
+    setLines((l) => [...l.slice(-499), line]);
+    lineChannel?.postMessage(line);                         // a Write pane in its own window shows it too
+  }, []);
 
   const notify: Notify = useCallback((msg, kind = "info") => {
     setToast({ msg, kind });
@@ -146,7 +155,7 @@ export function App() {
   }, [pickFiles]);
 
   const onPlot = useCallback((name: string, on: boolean) =>
-    setPlotted((p) => (on ? (p.includes(name) ? p : [...p, name]) : p.filter((n) => n !== name))), []);
+    setPlotted((p) => (on ? (p.includes(name) ? p : [...p, name]) : p.filter((n) => n !== name))), [setPlotted]);
 
   if (route === "#/design") return <><DesignPage /></>;
 
@@ -160,7 +169,7 @@ export function App() {
     graphic: <GraphicPane plotted={plotted} onPlot={onPlot} fileKey={fileKey} />,
   };
   // the five places on the page: two on top, two stacked at the bottom left, one at the bottom right
-  const shown = (id: PaneId) => !hidden.includes(id);
+  const shown = (id: PaneId) => !hidden.includes(id) && !popped.includes(id);
   const topIds = [order[0], order[1]].filter(shown);
   const leftIds = [order[2], order[3]].filter(shown);
   const rightId = shown(order[4]) ? order[4] : null;
@@ -181,8 +190,8 @@ export function App() {
         <button className="tb" onClick={() => setOpenDlg(true)} title="Open a recording or a database file"><FolderOpen size={14} /><span>Open file</span></button>
         <span className="sep" />
         <button className="tb" aria-pressed={hex} onClick={() => setHex(!hex)} title="Show IDs and data in hexadecimal or decimal">{hex ? "hex" : "dec"}</button>
-        {tab === "Measurement" && <ViewMenu hidden={hidden} onToggle={setVisible} onReset={reset} canReset={!isDefault} />}
-        <button className="tb" onClick={reset} disabled={isDefault || tab !== "Measurement"} title="Put the panes back where they started, at their default sizes"><RotateCcw size={13} /><span>Reset layout</span></button>
+        {tab === "Measurement" && <ViewMenu hidden={hidden} popped={popped} onToggle={setVisible} onDock={dockBack} onReset={resetAll} canReset={!nothingMoved} />}
+        <button className="tb" onClick={resetAll} disabled={nothingMoved || tab !== "Measurement"} title="Put the panes back where they started, at their default sizes"><RotateCcw size={13} /><span>Reset layout</span></button>
         <span className="muted" style={{ marginLeft: "auto" }}>
           {state?.replay ? "Replaying · " : ""}{state?.logging ? "Logging · " : ""}{running ? `${state?.elapsed.toFixed(0)} s` : "Stopped"}
         </span>
@@ -207,8 +216,8 @@ export function App() {
         ) : (
           <PaneContext.Provider value={controls}>
             <div className="layout" ref={rootRef}>
-              {hidden.length === PANE_IDS.length && (
-                <div className="empty" style={{ margin: "auto" }}>All panes are hidden. Open <b>View</b> in the toolbar to bring them back.</div>
+              {PANE_IDS.every((id) => !shown(id)) && (
+                <div className="empty" style={{ margin: "auto" }}>All panes are hidden or in their own windows. Open <b>View</b> in the toolbar to bring them back.</div>
               )}
               {topIds.length > 0 && (
                 <div className="lrow" ref={topRef} style={{ flex: `${bottomShown ? sizes.topH : 1} 1 0` }}>
@@ -258,6 +267,7 @@ export function App() {
         <span>{channels.length} channel{channels.length === 1 ? "" : "s"}</span>
         <span><span className={`dot ${mcpOn ? "ok" : ""}`} />MCP {mcpOn ? "on" : "off"}</span>
       </div>
+      <DragGhost drag={drag.state} />
       {toast && <Toast msg={toast.msg} kind={toast.kind} onDone={() => setToast(null)} />}
       <BusyOverlay busy={busy} />
       <DropOverlay show={dragging} />

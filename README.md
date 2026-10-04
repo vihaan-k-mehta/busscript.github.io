@@ -51,7 +51,7 @@ print Done
 
 Commands: `send`, `sendraw`, `wait`, `wait until`, `repeat`, `every`, `wave` (a signal that rises and falls by itself), `log start` / `log stop`, `print`, `start`, `stop`. Mistakes are explained with their line number. Scripts cannot run arbitrary code, they obey the same listen-only rule as everything else, and stop on their own after 30 minutes.
 
-Panes are movable and optional too. Drag a pane by its title onto another to swap places (or focus its move button and press an arrow key), press the X to hide it, the arrows button to enlarge it, and use **View** in the toolbar to show or hide any pane. Reset layout puts everything back.
+Panes are movable and optional too. Drag a pane by its title like a browser tab: a small tab follows the pointer, drop it on another pane to swap places, or let go outside the window (or press the pop-out button) to open it in a window of its own. Panes in their own windows share the live data, hex setting and graph choices, and come back when you close them, press Bring back in View, or press Reset layout. Closing the main window closes them all. You can also focus a pane's move button and press an arrow key, press the X to hide it, the arrows button to enlarge it, and use **View** in the toolbar to show or hide any pane. Reset layout puts everything back.
 
 Panes are resizable: drag a divider, or focus it and use the arrow keys (Shift for bigger steps, Home and End for the limits, Enter or double-click to reset). Sizes are remembered in the browser; the toolbar has Reset layout.
 

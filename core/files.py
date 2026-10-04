@@ -99,6 +99,40 @@ def _looks_like_candump(path: Path) -> bool:
     return bool(lines) and all(_CANDUMP_LINE.match(ln) for ln in lines)
 
 
+class _MessageList:
+    """Messages we parsed ourselves, shaped like the python-can readers so read_log treats them the same."""
+
+    def __init__(self, messages): self._m = messages
+    def __iter__(self): return iter(self._m)
+    def stop(self) -> None: pass
+
+
+def _csv_header(path: Path) -> str:
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+            return f.readline().strip().lower()
+    except OSError:
+        return ""
+
+
+def _read_own_csv(path: Path) -> "_MessageList":
+    """The CSV that Busscript itself saves (time_s, channel, id, extended, direction, dlc, data_hex, error, name)."""
+    import csv
+    out = []
+    with open(path, "r", newline="", encoding="utf-8-sig") as f:
+        for n, row in enumerate(csv.DictReader(f), start=2):
+            try:
+                ch = re.search(r"(\d+)$", row.get("channel") or "")
+                out.append(can.Message(
+                    timestamp=float(row["time_s"]), arbitration_id=int(row["id"], 0),
+                    is_extended_id=row["extended"].strip() == "1", is_rx=(row.get("direction") or "rx").strip() != "tx",
+                    is_error_frame=(row.get("error") or "0").strip() == "1", dlc=int(row["dlc"]),
+                    data=bytes.fromhex((row.get("data_hex") or "").replace(" ", "")), channel=int(ch.group(1)) if ch else None))
+            except (KeyError, ValueError) as e:
+                raise BusError(f"line {n} of '{path.name}' is not a frame row ({e}).")
+    return _MessageList(out)
+
+
 def read_log(path: Path, display: str, channel_for: Callable[[Optional[int]], str]) -> FileView:
     """Read any log python-can understands. channel_for maps the file's channel number to a Busscript channel name."""
     ext = path.suffix.lower()
@@ -113,7 +147,17 @@ def read_log(path: Path, display: str, channel_for: Callable[[Optional[int]], st
     view = FileView(name=display, path=str(path), format=LOG_EXTS[ext])
     first: Optional[float] = None
     try:
-        if ext == ".txt":                  # candump logs are often saved as .txt: accept the file only if it really is one
+        if ext == ".csv":
+            head = _csv_header(path)
+            if head.startswith("time_s,channel,id"):
+                reader = _read_own_csv(path)
+            elif not head.startswith("timestamp") and ("time" not in head) and ("data" in head or "id" in head):
+                raise BusError(f"'{path.name}' has the columns '{head[:60]}' but no time column, so Busscript cannot place "
+                               "the frames in time. It opens CSV files that start with a time column "
+                               "(the ones Busscript saves, or python-can's: timestamp, arbitration_id, extended, remote, error, dlc, data).")
+            else:
+                reader = can.LogReader(read_path)
+        elif ext == ".txt":                # candump logs are often saved as .txt: accept the file only if it really is one
             if not _looks_like_candump(path):
                 raise BusError(f"'{path.name}' is a text file, but not a candump log (lines like "
                                "'(1594702589.999073) can0 18F11031#0000FFFFFFFFFFFF').")

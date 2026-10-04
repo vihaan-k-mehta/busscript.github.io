@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Eye, RotateCcw } from "lucide-react";
+import type { HeaderDrag } from "./dock";
 
 /** Pane sizes as fractions. topH: height of the top row. topSplit: Trace share of the top row.
  *  botSplit: share of the bottom row taken by the Data/Write column. leftSplit: Data share of that column. */
@@ -32,6 +33,10 @@ export interface PaneControls {
   hide: (id: PaneId) => void;
   swap: (a: PaneId, b: PaneId) => void;
   nudge: (id: PaneId, delta: number) => void;
+  drag?: HeaderDrag;                                         // dragging the title like a browser tab
+  popOut?: (id: PaneId, screenX: number, screenY: number) => void;
+  dockBack?: (id: PaneId) => void;
+  inOwnWindow?: boolean;                                     // true inside a pop-out window
 }
 export const PaneContext = createContext<PaneControls | null>(null);
 export const usePaneControls = () => useContext(PaneContext);
@@ -136,7 +141,7 @@ export const Cell = ({ grow, children }: { grow: number; children: ReactNode }) 
 );
 
 /** The View menu: tick the panes you want to see. */
-export function ViewMenu({ hidden, onToggle, onReset, canReset }: { hidden: PaneId[]; onToggle: (id: PaneId, show: boolean) => void; onReset: () => void; canReset: boolean }) {
+export function ViewMenu({ hidden, popped = [], onToggle, onDock, onReset, canReset }: { hidden: PaneId[]; popped?: PaneId[]; onToggle: (id: PaneId, show: boolean) => void; onDock?: (id: PaneId) => void; onReset: () => void; canReset: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -155,11 +160,13 @@ export function ViewMenu({ hidden, onToggle, onReset, canReset }: { hidden: Pane
       {open && (
         <div className="menu" role="group" aria-label="Show panes">
           {PANE_IDS.map((id) => (
-            <label key={id}><input type="checkbox" checked={!hidden.includes(id)} onChange={(e) => onToggle(id, e.target.checked)} /> {PANE_NAMES[id]}</label>
+            popped.includes(id)
+              ? <div key={id} className="away">{PANE_NAMES[id]} <span className="muted">(in its own window)</span> <button className="btn" onClick={() => onDock?.(id)}>Bring back</button></div>
+              : <label key={id}><input type="checkbox" checked={!hidden.includes(id)} onChange={(e) => onToggle(id, e.target.checked)} /> {PANE_NAMES[id]}</label>
           ))}
           <hr />
           <button className="btn" onClick={() => { onReset(); setOpen(false); }} disabled={!canReset}><RotateCcw size={13} /> Put everything back</button>
-          <span className="muted">Drag a pane by its title to move it.</span>
+          <span className="muted">Drag a pane by its title to swap it with another. Drag it out of the window to pop it out.</span>
         </div>
       )}
     </div>
