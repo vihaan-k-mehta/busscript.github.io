@@ -351,3 +351,24 @@ def test_peaks_catch_a_spike_between_reads(tmp_path):
     finally:
         p.shutdown()
         b.stop()
+
+
+def test_graph_history_is_cleared_when_the_clock_restarts():
+    """After Stop and Start the time axis begins at 0 again. Old points would zigzag through the new line."""
+    b, chan = make_bus()
+    b.load_database("can1", DBC)
+    b.start()
+    p = peer(chan)
+    try:
+        b.watch(["VehicleSpeed.Speed"])
+        p.send(can.Message(arbitration_id=512, is_extended_id=False, data=(5000).to_bytes(2, "little") + b"\x00\x00"))
+        assert wait_for(lambda: len(b.history("VehicleSpeed.Speed")) == 1)
+        b.stop()
+        b.start()
+        assert b.history("VehicleSpeed.Speed") == []
+        p.send(can.Message(arbitration_id=512, is_extended_id=False, data=(1000).to_bytes(2, "little") + b"\x00\x00"))
+        assert wait_for(lambda: len(b.history("VehicleSpeed.Speed")) == 1)
+        assert [v for _, v in b.history("VehicleSpeed.Speed")] == [10.0]       # only the new run
+    finally:
+        p.shutdown()
+        b.stop()

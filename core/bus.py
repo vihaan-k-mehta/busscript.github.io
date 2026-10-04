@@ -218,6 +218,8 @@ class Bus:
                 self.ring.clear()
             self._latest.clear()
             self._peaks.clear()
+            for h in self._history.values():     # the clock starts again at 0: old points would zigzag through the new line
+                h.clear()
             self.dropped = 0
             self.running = True
             for name, bus in self._can.items():
