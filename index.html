@@ -56,7 +56,7 @@
     <section id="top" aria-labelledby="h-hero">
       <h1 id="h-hero">Script your CAN bus.</h1>
       <p class="lead">Busscript is a live CAN bus analyzer with a REST API and an MCP server. Your scripts, CI jobs and AI assistants can read a signal by name and send a frame, with no plugin and no Windows-only COM server.</p>
-      <a class="btn" href="Busscript.exe">Download for Windows (.exe)</a><a class="btn secondary" href="#start">How to run it</a>
+      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/releases/latest/download/Busscript.exe">Download for Windows (.exe)</a><a class="btn secondary" href="#start">How to run it</a>
       <figure>
         <img class="shot" src="img/measurement.png" width="1440" height="849" alt="The Busscript Measurement view with a live frame trace, decoded signal values, bus statistics, a signal plot and an event log, running on the built-in demo bus.">
         <figcaption>The Measurement view on the built-in demo bus: no hardware needed to try it.</figcaption>
@@ -77,7 +77,8 @@
       <div class="cols">
         <div class="card"><h3>Send a signal by name</h3><p>Post <code>EngineData</code> with <code>{"Gear": "Second", "ThrottlePos": 20}</code>. Busscript encodes it with your DBC file. Values out of range are refused, so a typo does not become a frame.</p></div>
         <div class="card"><h3>REST for everything the UI does</h3><p>Start and stop, read decoded signals, transmit, log and replay over plain HTTP, from any language. A runnable Python example and curl commands are in the README.</p></div>
-        <div class="card"><h3>An MCP server for AI assistants</h3><p>Seventeen tools: read frames and signals, send, log and replay, and open a recording to summarise it or read one signal across the whole file. It is off until you switch it on, each tool has its own switch, and every call shows in an activity log.</p></div>
+        <div class="card"><h3>An MCP server for AI assistants</h3><p>Seventeen tools: read frames and signals, send, log and replay, and open a recording to summarise it or read one signal across the whole file. Connecting Claude Code is one pasted prompt: press a button, paste, done. It is off until you switch it on, each tool has its own switch, and every call shows in an activity log.</p></div>
+        <div class="card"><h3>A command line too</h3><p>From a terminal: <code>busscript stats drive.asc</code>, <code>busscript find drive.asc "id == 0x100"</code>, <code>busscript convert drive.blf drive.csv</code>, <code>busscript status</code>. File commands need nothing else running, and every command has a plain-sentence error and a proper exit code for scripts.</p></div>
         <div class="card"><h3>Careful about transmitting</h3><p>Channels start listen-only. MCP transmit is a separate switch, off by default and limited to 20 frames a second. File paths from an assistant stay inside one folder.</p></div>
         <div class="card"><h3>Open any recording</h3><p>Drag in an MF4 (MDF4), ASC, BLF, candump, PEAK trace, CSV or SQLite log and browse it with no hardware: filter by message, jump to a time, plot a signal across the whole file. Drop a DBC file in and every signal gets its name. Sample recordings are included.</p></div>
         <div class="card"><h3>Arrange it your way</h3><p>Drag panes by their title to swap places, resize them with the dividers, hide any pane with its X or the View menu, or enlarge one to fill the window. Busscript remembers your layout.</p></div>
@@ -90,8 +91,8 @@
       <h2 style="margin-top:40px">And the analyzer basics</h2>
       <p class="lead" style="font-size:17px">Live trace with decoded names, a signal table with units and value tables, a plot, bus load and error counts, ID filters, cyclic transmit, CAN FD, DBC files per channel.</p>
       <figure>
-        <img class="shot" src="img/mcp.png" width="1440" height="849" alt="The Busscript MCP settings dialog showing the enable switch, a client connection snippet with the token hidden, and a list of tools each with a switch.">
-        <figcaption>MCP settings: an on switch, a connection snippet, a switch per tool and a separate transmit switch.</figcaption>
+        <img class="shot" src="img/mcp.png" width="1440" height="849" alt="The Busscript MCP dialog with a Quick start for Claude Code section: one button copies a ready setup prompt with the token hidden, above the enable switch and a list of tools each with a switch.">
+        <figcaption>MCP: one button copies the whole Claude Code setup prompt, then an on switch, a switch per tool and a separate transmit switch.</figcaption>
       </figure>
     </section>
 
@@ -110,7 +111,7 @@
     <section id="start" aria-labelledby="h-start">
       <h2 id="h-start">Download and run</h2>
       <ol class="steps">
-        <li><strong><a href="Busscript.exe">Download Busscript.exe</a></strong> (about 56 MB) and double-click it. Nothing to install: no Python, no libraries. It opens in a real window of its own (no browser) on a demo bus with synthetic traffic, so you can try everything with no hardware. Windows may say the publisher is unknown, because the program is not code-signed: choose More info, then Run anyway.</li>
+        <li><strong><a href="https://github.com/vihaan-k-mehta/busscript.github.io/releases/latest/download/Busscript.exe">Download Busscript.exe</a></strong> (about 65 MB) and double-click it. Nothing to install: no Python, no libraries. It opens in a real window of its own (no browser) on a demo bus with synthetic traffic, so you can try everything with no hardware. Windows may say the publisher is unknown, because the program is not code-signed: choose More info, then Run anyway.</li>
         <li><strong>Try a recording:</strong> press <strong>Open file</strong> and choose <code>samples/demo_drive.mf4</code>, or drag any log onto the window.</li>
         <li><strong>Use your own adapter:</strong> press <strong>Use my own adapter</strong> in the demo banner, add a channel on the Setup tab and attach a DBC file. Next time it starts on your channels, not the demo.</li>
         <li><strong>Drive it from code:</strong> call the REST API, or switch on MCP and connect your assistant.</li>
@@ -156,7 +157,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
     <section aria-labelledby="h-final">
       <h2 id="h-final">Try it without hardware</h2>
       <p class="lead">One command starts a demo bus. Then point a script at it.</p>
-      <a class="btn" href="Busscript.exe">Download for Windows (.exe)</a>
+      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/releases/latest/download/Busscript.exe">Download for Windows (.exe)</a>
     </section>
   </main>
 

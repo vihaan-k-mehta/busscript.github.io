@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from . import analysis, protocols
+from . import analysis, protocols, quickstart
 from .export import FORMATS, write_frames, write_signals
 from .bus import Bus, BusError
 from .doctor import check as check_setup
@@ -578,6 +578,11 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
             v = json.dumps(v)
         store.set_setting(key, v)
         return {"ok": True}
+
+    @app.get("/api/mcp/quickstart")
+    def mcp_quickstart(request: Request):
+        """The ready-made prompt and commands for connecting Claude (they contain the token: shown only to this app)."""
+        return quickstart.build(f"http://{request.headers.get('host', '127.0.0.1')}/mcp", token)
 
     @app.get("/api/mcp/activity")
     def mcp_activity():

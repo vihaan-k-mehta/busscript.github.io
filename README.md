@@ -57,11 +57,31 @@ Panes are resizable: drag a divider, or focus it and use the arrow keys (Shift f
 
 ## MCP
 
-Settings -> MCP: switch it on, copy the client config. Endpoint `http://127.0.0.1:8765/mcp` with `Authorization: Bearer <token>`, or `python -m core --mcp-stdio`.
+**Quick start for Claude Code (one prompt):** open MCP at the top of the window, press **Turn on MCP and copy the setup prompt**, then paste it into Claude Code. Claude runs the setup itself (`claude mcp add --scope user --transport http busscript ...`), checks the connection and tells you what is on the bus. The prompt holds your private token, so paste it only into your own Claude. From a terminal, `busscript mcp` prints the same prompt and `busscript mcp --setup` does the registration for you.
+
+Other apps (Claude Desktop and similar): the dialog also has a settings block that starts Busscript itself with `--mcp-stdio`, no token needed. Or connect by hand: endpoint `http://127.0.0.1:8765/mcp` with `Authorization: Bearer <token>`, or `python -m core --mcp-stdio`.
 
 Tools: `list_channels`, `load_dbc`, `start_measurement`, `stop_measurement`, `get_recent_frames`, `read_signal`, `get_statistics`, `start_logging`, `stop_logging`, `start_replay`, `stop_replay`, `send_frame`, `send_signal`, and for recordings `list_files`, `open_file`, `file_overview`, `file_signal`.
 
 Safety: off until you enable it; each tool can be switched off; `send_frame` and `send_signal` are off by default (MCP transmit is a separate switch, rate-limited to 20 frames per second) and channels are listen-only by default; files must live in the data directory (`~/busscript-data`, or `BUSSCRIPT_DATA`); every call shows in the activity log. Bus data is returned as structured JSON and is untrusted: other devices control it.
+
+## Command line
+
+Everything below also works as `python -m core <command>` from the project folder. With the exe, use `Busscript.exe <command>`. In PowerShell or cmd the exe does not hold the prompt back, so for tidy output add `| more`, for example `Busscript.exe stats drive.asc | more`.
+
+| Command | What it does |
+|---|---|
+| `doctor` | check the libraries and adapter drivers |
+| `describe 0x7E8 04 41 0C 1A F8` | say what a frame means (J1939, OBD-II, UDS) |
+| `stats FILE` | how often each message arrives (`--json` for scripts) |
+| `find FILE "id == 0x100 and d0 == 5"` | list matching frames; exit code 1 when none match |
+| `diag FILE` | fault codes and diagnostic conversations |
+| `convert IN OUT.csv` | change format (csv, asc, blf, mf4); `--where` keeps matching frames, `--around`/`--until`/`--before`/`--after` keep the time around an event |
+| `status`, `frames -n 20`, `signals`, `start`, `stop` | ask or control a running Busscript (the window, or `serve`) |
+| `mcp`, `mcp --setup` | connect Claude (see MCP) |
+| `serve` | run with no window (the same as `--no-browser`) |
+
+The file commands need nothing else running. The live commands find Busscript on port 8765 (or the next free ones) and use the same private token as the window. `--data-dir` and `--port` can go anywhere on the line. Errors are one plain sentence and a non-zero exit code.
 
 ## Automate it
 

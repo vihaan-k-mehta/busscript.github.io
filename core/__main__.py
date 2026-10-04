@@ -19,6 +19,13 @@ SAMPLE_DBC = Path(__file__).resolve().parents[1] / "samples" / "demo.dbc"
 
 
 def main() -> None:
+    import sys
+    from . import cli
+    argv = sys.argv[1:]
+    if argv and argv[0] in cli.COMMANDS and argv[0] != "serve":      # a terminal command: do it and leave
+        raise SystemExit(cli.run(argv))
+    if argv and argv[0] == "serve":                                    # no window: the same as --no-browser
+        sys.argv = [sys.argv[0], "--no-browser"] + argv[1:]
     ap = argparse.ArgumentParser(prog="core", description="Busscript: a local CAN bus tool with an MCP server")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--data-dir", type=Path, default=None)

@@ -9,6 +9,7 @@ export function McpDialog({ open, onClose, notify }: { open: boolean; onClose: (
   const [s, setS] = useState<Settings>({});
   const [act, setAct] = useState<Activity[]>([]);
   const [showToken, setShowToken] = useState(false);
+  const [qs, setQs] = useState<{ prompt: string; stdio: unknown } | null>(null);
   const load = useCallback(() => {
     api<Settings>("/api/settings").then(setS).catch((e) => notify((e as Error).message, "error"));
     api<Activity[]>("/api/mcp/activity").then(setAct).catch(() => {});
@@ -28,7 +29,16 @@ export function McpDialog({ open, onClose, notify }: { open: boolean; onClose: (
   const disabled: string[] = (() => { try { return JSON.parse(String(s["mcp.tools_disabled"] ?? "[]")); } catch { return []; } })();
   const tools = (s["mcp.tools_all"] as string[]) ?? [];
   const url = `${location.origin}/mcp`;
-  const cfg = JSON.stringify({ mcpServers: { "busscript": { type: "http", url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
+  useEffect(() => { if (open) api<{ prompt: string; stdio: unknown }>("/api/mcp/quickstart").then(setQs).catch(() => {}); }, [open]);
+  const copy = (text: string, done: string) => navigator.clipboard.writeText(text).then(() => notify(done), () => notify("Copy failed. Select the text and copy it by hand.", "error"));
+  /** One click: switch MCP on, then copy the whole prompt. */
+  const quick = async () => {
+    if (!qs) return;
+    if (!on) await put("mcp.enabled", "true");
+    await copy(qs.prompt, "Copied. Now paste it into Claude Code.");
+  };
+  const stdioCfg = JSON.stringify(qs?.stdio ?? {}, null, 2);
+  const box = { whiteSpace: "pre-wrap" as const, overflowWrap: "anywhere" as const, background: "var(--color-surface)", padding: 8, margin: "4px 0" };
 
   return (
     <Modal title="MCP server" open={open} onClose={onClose}>
@@ -37,14 +47,28 @@ export function McpDialog({ open, onClose, notify }: { open: boolean; onClose: (
         <span className="muted">(AI clients can call the tools below while this is on)</span>
       </label>
       <div><span className={`dot ${on ? "ok" : ""}`} />{on ? "On" : "Off"}. Endpoint {url} (this computer only, token required)</div>
-      <div>
-        <b>Connect a client</b>
-        <pre className="mono" style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", background: "var(--color-surface)", padding: 8, margin: "4px 0" }}>
-          {showToken ? cfg : cfg.split(token).join("********")}
-        </pre>
-        <button className="btn" onClick={() => setShowToken(!showToken)}>{showToken ? "Hide token" : "Show token"}</button>{" "}
-        <button className="btn" onClick={() => navigator.clipboard.writeText(cfg).then(() => notify("Copied (includes the token)"), () => notify("Copy failed", "error"))}>Copy config</button>
-      </div>
+      <section aria-labelledby="h-quick" style={{ border: "1px solid var(--color-border)", borderRadius: 6, padding: 10 }}>
+        <b id="h-quick">Quick start for Claude Code</b>
+        <p style={{ margin: "4px 0" }}>One prompt does the whole setup. Press the button, open Claude Code, paste, and send. Claude connects itself, checks that it worked, and tells you what is on the bus.</p>
+        <button className="btn primary" disabled={!qs} onClick={quick}>{on ? "Copy the setup prompt" : "Turn on MCP and copy the setup prompt"}</button>{" "}
+        <button className="btn" onClick={() => setShowToken(!showToken)}>{showToken ? "Hide token" : "Show token"}</button>
+        {qs && <pre className="mono" aria-label="Setup prompt" style={box}>{showToken ? qs.prompt : qs.prompt.split(token).join("********")}</pre>}
+        <div className="muted">The prompt holds your private token, so only paste it into your own Claude. Sending frames stays off until you allow it below.</div>
+      </section>
+      <details>
+        <summary><b>Other apps (Claude Desktop and similar)</b></summary>
+        <p style={{ margin: "4px 0" }}>These start Busscript themselves, so no token is needed and this window does not have to be open. Add this to the app's MCP settings file:</p>
+        <pre className="mono" style={box}>{stdioCfg}</pre>
+        <button className="btn" onClick={() => copy(stdioCfg, "Copied the settings")}>Copy settings</button>
+        <p className="muted" style={{ margin: "4px 0" }}>If a real adapter is connected, only one of Busscript and a started copy can use it at a time. Prefer the Claude Code prompt above in that case.</p>
+      </details>
+      <details>
+        <summary><b>From a terminal</b></summary>
+        <pre className="mono" style={box}>{`busscript mcp            # prints the same prompt
+busscript mcp --setup    # turns MCP on and registers it with Claude Code
+busscript status         # what Busscript is doing
+busscript help           # everything the command line can do`}</pre>
+      </details>
       <div>
         <b>Tools</b>
         {tools.map((t) => {
