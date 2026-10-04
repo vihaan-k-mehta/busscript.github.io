@@ -21,7 +21,7 @@ def main() -> None:
     work = ROOT / "build"
     shutil.rmtree(work, ignore_errors=True)
     cmd = [
-        sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--name", "Busscript",
+        sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noconsole", "--name", "Busscript",
         "--distpath", str(ROOT / "dist"), "--workpath", str(work), "--specpath", str(work),
         "--add-data", f"{ROOT / 'ui' / 'dist'}{SEP}ui/dist",
         "--add-data", f"{ROOT / 'samples'}{SEP}samples",

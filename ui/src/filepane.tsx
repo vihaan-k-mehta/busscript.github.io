@@ -94,7 +94,7 @@ export function FileTracePane({ info, hex, rev }: { info: FileSummary; hex: bool
   );
 
   return (
-    <Pane title={`Trace: ${info.name}`} icon={<FileText size={14} />} tools={tools}>
+    <Pane paneId="trace" title={`Trace: ${info.name}`} icon={<FileText size={14} />} tools={tools}>
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div ref={parent} style={{ flex: 1, minHeight: 0, overflow: "auto" }} role={total > 0 ? "grid" : undefined}
           aria-rowcount={total > 0 ? total : undefined} aria-label={total > 0 ? "Frames in the file" : undefined}>
@@ -150,7 +150,7 @@ export function FileInfoPane({ info, rev }: { info: FileSummary; rev: number }) 
     ["Error frames", String(info.error_frames)],
   ];
   return (
-    <Pane title="File">
+    <Pane paneId="stat" title="File">
       <div className="kv" style={{ gridTemplateColumns: "1fr" }}>
         {facts.map(([k, val]) => <div key={k}><span>{k}</span><span className="v" style={{ textAlign: "right", wordBreak: "break-all" }}>{val}</span></div>)}
       </div>

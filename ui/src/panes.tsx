@@ -54,7 +54,7 @@ export function TracePane({ hex }: { hex: boolean }) {
   );
 
   return (
-    <Pane title="Trace" icon={<ListTree size={14} />} tools={tools}>
+    <Pane paneId="trace" title="Trace" icon={<ListTree size={14} />} tools={tools}>
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div ref={parent} style={{ flex: 1, minHeight: 0, overflow: "auto" }} role={count > 0 ? "grid" : undefined} aria-rowcount={count > 0 ? count : undefined} aria-label={count > 0 ? "Frames" : undefined}>
         {count === 0 ? (
@@ -127,7 +127,7 @@ export function DataPane({ running, plotted, onPlot, fileKey }: { running: boole
     </>
   );
   return (
-    <Pane title="Data" tools={tools}>
+    <Pane paneId="data" title="Data" tools={tools}>
       {vals.length === 0 ? (
         <div className="empty">{cat.length === 0 ? (fileMode ? "No database attached. Open a DBC file (Open file) and the signals in this recording get their names." : "No database loaded. Attach a DBC file on the Setup tab to see signal values.") : "No decoded frames yet."}</div>
       ) : (
@@ -229,7 +229,7 @@ export function GraphicPane({ plotted, onPlot, fileKey }: { plotted: string[]; o
     </>
   );
   return (
-    <Pane title="Graphic" tools={tools}>
+    <Pane paneId="graphic" title="Graphic" tools={tools}>
       {plotted.length === 0 ? (
         <div className="empty">No signals chosen. Tick “Graph” in the Data pane, or add one above.</div>
       ) : (
@@ -259,7 +259,7 @@ export function StatPane() {
   const lv = useLive();
   const names = Object.keys(lv.stats);
   return (
-    <Pane title="Bus statistic">
+    <Pane paneId="stat" title="Bus statistic">
       {names.length === 0 ? <div className="empty">No channel configured.</div> : names.map((n) => {
         const s = lv.stats[n];
         const rows: [string, string][] = [
@@ -286,7 +286,7 @@ export function WritePane({ lines }: { lines: LogLine[] }) {
   const [tab, setTab] = useState<"All" | "System" | "MCP">("All");
   const shown = lines.filter((l) => tab === "All" || l.source === tab);
   return (
-    <Pane title="Write" tools={
+    <Pane paneId="write" title="Write" tools={
       <div role="tablist" aria-label="Source" style={{ display: "flex", gap: 2 }}>
         {(["All", "System", "MCP"] as const).map((t) => <button key={t} role="tab" aria-selected={tab === t} className="tb" onClick={() => setTab(t)}>{t}</button>)}
       </div>}>

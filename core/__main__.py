@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -11,6 +13,7 @@ from .demo import start_demo_traffic
 from .models import ChannelConfig
 from .server import create_app
 from .store import Store
+from .window import free_port, open_app_window
 
 SAMPLE_DBC = Path(__file__).resolve().parents[1] / "samples" / "demo.dbc"
 
@@ -21,7 +24,8 @@ def main() -> None:
     ap.add_argument("--data-dir", type=Path, default=None)
     ap.add_argument("--demo", action="store_true", help="virtual bus with synthetic traffic and the sample DBC")
     ap.add_argument("--live", action="store_true", help="never start the demo; use only your own channels")
-    ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--browser", action="store_true", help="open in your normal browser instead of an app window")
+    ap.add_argument("--no-browser", action="store_true", help="do not open any window")
     ap.add_argument("--mcp-stdio", action="store_true", help="serve MCP over stdio instead of the web app")
     args = ap.parse_args()
 
@@ -52,12 +56,24 @@ def main() -> None:
 
     token = store.token()
     app = create_app(bus, store, token)
-    url = f"http://127.0.0.1:{args.port}/?token={token}"
+    port = free_port(args.port)
+    url = f"http://127.0.0.1:{port}/?token={token}"
     print(f"Busscript: {url}")
-    print(f"MCP endpoint: http://127.0.0.1:{args.port}/mcp  (Authorization: Bearer <token>; enable in Settings)")
+    print(f"MCP endpoint: http://127.0.0.1:{port}/mcp  (Authorization: Bearer <token>; enable in Settings)")
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+
+    def show() -> None:      # wait until the server answers, so the window never opens on an error page
+        for _ in range(100):
+            if server.started:
+                break
+            time.sleep(0.1)
+        if args.browser or not open_app_window(url, store.data_dir / "window", lambda: setattr(server, "should_exit", True)):
+            webbrowser.open(url)
+
     if not args.no_browser:
-        webbrowser.open(url)
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+        threading.Thread(target=show, daemon=True, name="open-window").start()
+    server.run()
+    bus.stop()
 
 
 if __name__ == "__main__":

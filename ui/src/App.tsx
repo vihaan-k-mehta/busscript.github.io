@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Play, Square, Bot, RotateCcw, FolderOpen } from "lucide-react";
 import { api, token, type BusState, type Channel, type FileSummary, type OpenResult } from "./api";
 import { live, useLive } from "./live";
@@ -10,7 +10,7 @@ import { DiagnosticsPage } from "./diag";
 import { AnalyzePage } from "./analyze";
 import { DesignPage } from "./design";
 import { Toast, type Notify } from "./ui";
-import { Cell, Splitter, useLayout } from "./layout";
+import { Cell, PANE_IDS, PANE_NAMES, PaneContext, Splitter, ViewMenu, useLayout, type PaneId } from "./layout";
 import { BusyOverlay, DropOverlay, OpenFileDialog, describe, importFiles, type Busy } from "./openfile";
 import { FileInfoPane, FileTracePane } from "./filepane";
 
@@ -32,7 +32,7 @@ export function App() {
   const [busy, setBusy] = useState<Busy | null>(null);
   const [openDlg, setOpenDlg] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const { sizes, set, reset, isDefault } = useLayout();
+  const { sizes, set, resetSizes, reset, isDefault, order, hidden, controls, setVisible } = useLayout();
   const rootRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const botRef = useRef<HTMLDivElement>(null);
@@ -151,6 +151,20 @@ export function App() {
   if (route === "#/design") return <><DesignPage /></>;
 
   const load = state?.running ? lv.stats : {};
+  const fileKey = fileInfo ? `${fileInfo.name}|${fileInfo.frames}|${fileRev}` : undefined;
+  const node: Record<PaneId, ReactNode> = {
+    trace: fileInfo ? <FileTracePane info={fileInfo} hex={hex} rev={fileRev} /> : <TracePane hex={hex} />,
+    stat: fileInfo ? <FileInfoPane info={fileInfo} rev={fileRev} /> : <StatPane />,
+    data: <DataPane running={running} plotted={plotted} onPlot={onPlot} fileKey={fileKey} />,
+    write: <WritePane lines={lines} />,
+    graphic: <GraphicPane plotted={plotted} onPlot={onPlot} fileKey={fileKey} />,
+  };
+  // the five places on the page: two on top, two stacked at the bottom left, one at the bottom right
+  const shown = (id: PaneId) => !hidden.includes(id);
+  const topIds = [order[0], order[1]].filter(shown);
+  const leftIds = [order[2], order[3]].filter(shown);
+  const rightId = shown(order[4]) ? order[4] : null;
+  const bottomShown = leftIds.length > 0 || rightId !== null;
   const busLoad = Math.max(0, ...Object.values(load).map((s) => s.load_pct));
 
   return (
@@ -167,7 +181,8 @@ export function App() {
         <button className="tb" onClick={() => setOpenDlg(true)} title="Open a recording or a database file"><FolderOpen size={14} /><span>Open file</span></button>
         <span className="sep" />
         <button className="tb" aria-pressed={hex} onClick={() => setHex(!hex)} title="Show IDs and data in hexadecimal or decimal">{hex ? "hex" : "dec"}</button>
-        <button className="tb" onClick={reset} disabled={isDefault || tab !== "Measurement"} title="Put the panes back to their default sizes"><RotateCcw size={13} /><span>Reset layout</span></button>
+        {tab === "Measurement" && <ViewMenu hidden={hidden} onToggle={setVisible} onReset={reset} canReset={!isDefault} />}
+        <button className="tb" onClick={reset} disabled={isDefault || tab !== "Measurement"} title="Put the panes back where they started, at their default sizes"><RotateCcw size={13} /><span>Reset layout</span></button>
         <span className="muted" style={{ marginLeft: "auto" }}>
           {state?.replay ? "Replaying · " : ""}{state?.logging ? "Logging · " : ""}{running ? `${state?.elapsed.toFixed(0)} s` : "Stopped"}
         </span>
@@ -190,26 +205,49 @@ export function App() {
         ) : tab === "Scripts" ? (
           <ScriptsPage state={state} notify={notify} />
         ) : (
-          <div className="layout" ref={rootRef}>
-            <div className="lrow" ref={topRef} style={{ flex: `${sizes.topH} 1 0` }}>
-              <Cell grow={sizes.topSplit}>{fileInfo ? <FileTracePane info={fileInfo} hex={hex} rev={fileRev} /> : <TracePane hex={hex} />}</Cell>
-              <Splitter orientation="vertical" container={topRef} value={sizes.topSplit} onChange={(v) => set("topSplit", v)} onReset={reset} label="Resize Trace and Bus statistic" />
-              <Cell grow={1 - sizes.topSplit}>{fileInfo ? <FileInfoPane info={fileInfo} rev={fileRev} /> : <StatPane />}</Cell>
+          <PaneContext.Provider value={controls}>
+            <div className="layout" ref={rootRef}>
+              {hidden.length === PANE_IDS.length && (
+                <div className="empty" style={{ margin: "auto" }}>All panes are hidden. Open <b>View</b> in the toolbar to bring them back.</div>
+              )}
+              {topIds.length > 0 && (
+                <div className="lrow" ref={topRef} style={{ flex: `${bottomShown ? sizes.topH : 1} 1 0` }}>
+                  {topIds.length === 2 ? (
+                    <>
+                      <Cell grow={sizes.topSplit}>{node[topIds[0]]}</Cell>
+                      <Splitter orientation="vertical" container={topRef} value={sizes.topSplit} onChange={(v) => set("topSplit", v)} onReset={resetSizes} label={`Resize ${PANE_NAMES[topIds[0]]} and ${PANE_NAMES[topIds[1]]}`} />
+                      <Cell grow={1 - sizes.topSplit}>{node[topIds[1]]}</Cell>
+                    </>
+                  ) : <Cell grow={1}>{node[topIds[0]]}</Cell>}
+                </div>
+              )}
+              {topIds.length > 0 && bottomShown && (
+                <Splitter orientation="horizontal" container={rootRef} value={sizes.topH} onChange={(v) => set("topH", v)} onReset={resetSizes} label="Resize top and bottom panes" />
+              )}
+              {bottomShown && (
+                <div className="lrow" ref={botRef} style={{ flex: `${topIds.length > 0 ? 1 - sizes.topH : 1} 1 0` }}>
+                  {leftIds.length > 0 && (
+                    <div className="lcol" ref={leftRef} style={{ flex: `${rightId ? sizes.botSplit : 1} 1 0` }}>
+                      {leftIds.length === 2 ? (
+                        <>
+                          <Cell grow={sizes.leftSplit}>{node[leftIds[0]]}</Cell>
+                          <Splitter orientation="horizontal" container={leftRef} value={sizes.leftSplit} onChange={(v) => set("leftSplit", v)} onReset={resetSizes} label={`Resize ${PANE_NAMES[leftIds[0]]} and ${PANE_NAMES[leftIds[1]]}`} />
+                          <Cell grow={1 - sizes.leftSplit}>{node[leftIds[1]]}</Cell>
+                        </>
+                      ) : <Cell grow={1}>{node[leftIds[0]]}</Cell>}
+                    </div>
+                  )}
+                  {leftIds.length > 0 && rightId && (
+                    <Splitter orientation="vertical" container={botRef} value={sizes.botSplit} onChange={(v) => set("botSplit", v)} onReset={resetSizes} label={`Resize ${leftIds.map((i) => PANE_NAMES[i]).join(" and ")} against ${PANE_NAMES[rightId]}`} />
+                  )}
+                  {rightId && <Cell grow={leftIds.length > 0 ? 1 - sizes.botSplit : 1}>{node[rightId]}</Cell>}
+                </div>
+              )}
             </div>
-            <Splitter orientation="horizontal" container={rootRef} value={sizes.topH} onChange={(v) => set("topH", v)} onReset={reset} label="Resize top and bottom panes" />
-            <div className="lrow" ref={botRef} style={{ flex: `${1 - sizes.topH} 1 0` }}>
-              <div className="lcol" ref={leftRef} style={{ flex: `${sizes.botSplit} 1 0` }}>
-                <Cell grow={sizes.leftSplit}><DataPane running={running} plotted={plotted} onPlot={onPlot} fileKey={fileInfo ? `${fileInfo.name}|${fileInfo.frames}|${fileRev}` : undefined} /></Cell>
-                <Splitter orientation="horizontal" container={leftRef} value={sizes.leftSplit} onChange={(v) => set("leftSplit", v)} onReset={reset} label="Resize Data and Write" />
-                <Cell grow={1 - sizes.leftSplit}><WritePane lines={lines} /></Cell>
-              </div>
-              <Splitter orientation="vertical" container={botRef} value={sizes.botSplit} onChange={(v) => set("botSplit", v)} onReset={reset} label="Resize Data and Write against Graphic" />
-              <Cell grow={1 - sizes.botSplit}><GraphicPane plotted={plotted} onPlot={onPlot} fileKey={fileInfo ? `${fileInfo.name}|${fileInfo.frames}|${fileRev}` : undefined} /></Cell>
-            </div>
-          </div>
+          </PaneContext.Provider>
         )}
       </main>
-      <div className="tabs" role="tablist" aria-label="View">
+      <div className="tabs" role="tablist" aria-label="Pages">
         {(["Setup", "Measurement", "Scripts", "Diagnostics", "Analyze"] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>
         ))}

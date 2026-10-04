@@ -18,7 +18,7 @@ To use your own adapter press **Use my own adapter** in the demo banner and add 
 
 Build the exe yourself with `pip install pyinstaller` then `python scripts/make_exe.py` (needs the built UI). Node.js is not needed: the UI is already built (`ui/dist`).
 
-Open the link that is printed in the window; it contains your access token.
+Busscript opens in its own window (Microsoft Edge or Chrome in app mode, with no address bar or tabs and its own taskbar icon). Closing that window quits Busscript. If you would rather use your normal browser, run `start.bat --browser`. The link printed in the console contains your access token.
 
 The first run downloads about 150 MB of libraries, mostly the ones that read MF4 files, so give it a few minutes.
 
@@ -50,6 +50,8 @@ print Done
 ```
 
 Commands: `send`, `sendraw`, `wait`, `wait until`, `repeat`, `every`, `wave` (a signal that rises and falls by itself), `log start` / `log stop`, `print`, `start`, `stop`. Mistakes are explained with their line number. Scripts cannot run arbitrary code, they obey the same listen-only rule as everything else, and stop on their own after 30 minutes.
+
+Panes are movable and optional too. Drag a pane by its title onto another to swap places (or focus its move button and press an arrow key), press the X to hide it, the arrows button to enlarge it, and use **View** in the toolbar to show or hide any pane. Reset layout puts everything back.
 
 Panes are resizable: drag a divider, or focus it and use the arrow keys (Shift for bigger steps, Home and End for the limits, Enter or double-click to reset). Sizes are remembered in the browser; the toolbar has Reset layout.
 

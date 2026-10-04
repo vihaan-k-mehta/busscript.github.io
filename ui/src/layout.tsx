@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Eye, RotateCcw } from "lucide-react";
 
 /** Pane sizes as fractions. topH: height of the top row. topSplit: Trace share of the top row.
  *  botSplit: share of the bottom row taken by the Data/Write column. leftSplit: Data share of that column. */
@@ -6,6 +7,34 @@ export interface Sizes { topH: number; topSplit: number; botSplit: number; leftS
 
 export const DEFAULTS: Sizes = { topH: 0.42, topSplit: 0.66, botSplit: 0.42, leftSplit: 0.55 };
 const KEY = "busscript-layout-v1";
+const KEY2 = "busscript-panes-v1";
+
+/** The five panes of the Measurement page. Dragging a pane onto another swaps their places. */
+export type PaneId = "trace" | "stat" | "data" | "write" | "graphic";
+export const PANE_IDS: PaneId[] = ["trace", "stat", "data", "write", "graphic"];
+export const PANE_NAMES: Record<PaneId, string> = { trace: "Trace", stat: "Bus statistic", data: "Data", write: "Write", graphic: "Graphic" };
+export interface Arrangement { order: PaneId[]; hidden: PaneId[] }
+
+function loadArrangement(): Arrangement {
+  try {
+    const p = JSON.parse(localStorage.getItem(KEY2) ?? "null");
+    const order = Array.isArray(p?.order) ? (p.order as PaneId[]) : [];
+    const valid = order.length === PANE_IDS.length && PANE_IDS.every((id) => order.includes(id));
+    const hidden = Array.isArray(p?.hidden) ? (p.hidden as PaneId[]).filter((id) => PANE_IDS.includes(id)) : [];
+    return { order: valid ? order : [...PANE_IDS], hidden };
+  } catch {
+    return { order: [...PANE_IDS], hidden: [] };
+  }
+}
+
+/** What a pane's header needs to offer: hide, drag to swap, move with the keyboard. */
+export interface PaneControls {
+  hide: (id: PaneId) => void;
+  swap: (a: PaneId, b: PaneId) => void;
+  nudge: (id: PaneId, delta: number) => void;
+}
+export const PaneContext = createContext<PaneControls | null>(null);
+export const usePaneControls = () => useContext(PaneContext);
 const MIN = 0.15;
 const MAX = 0.85;
 
@@ -30,9 +59,27 @@ export function useLayout() {
   const set = useCallback((key: keyof Sizes, value: number) => {
     setSizes((s) => { const n = { ...s, [key]: clamp(value) }; save(n); return n; });
   }, []);
-  const reset = useCallback(() => { setSizes(DEFAULTS); save(DEFAULTS); }, []);
-  const isDefault = (Object.keys(DEFAULTS) as (keyof Sizes)[]).every((k) => Math.abs(sizes[k] - DEFAULTS[k]) < 0.001);
-  return { sizes, set, reset, isDefault };
+  const [arr, setArr] = useState<Arrangement>(loadArrangement);
+  const saveArr = (a: Arrangement) => { try { localStorage.setItem(KEY2, JSON.stringify(a)); } catch { /* not remembered */ } };
+  const update = useCallback((fn: (a: Arrangement) => Arrangement) => setArr((a) => { const n = fn(a); saveArr(n); return n; }), []);
+  const exchange = (a: Arrangement, i: number, j: number): Arrangement => {
+    if (i === j || j < 0 || j >= a.order.length) return a;
+    const order = [...a.order];
+    [order[i], order[j]] = [order[j], order[i]];
+    return { ...a, order };
+  };
+  const controls: PaneControls = {
+    hide: (id) => update((a) => ({ ...a, hidden: a.hidden.includes(id) ? a.hidden : [...a.hidden, id] })),
+    swap: (x, y) => update((a) => exchange(a, a.order.indexOf(x), a.order.indexOf(y))),
+    nudge: (id, d) => update((a) => exchange(a, a.order.indexOf(id), a.order.indexOf(id) + d)),
+  };
+  const setVisible = (id: PaneId, show: boolean) =>
+    update((a) => ({ ...a, hidden: show ? a.hidden.filter((h) => h !== id) : a.hidden.includes(id) ? a.hidden : [...a.hidden, id] }));
+  const resetSizes = useCallback(() => { setSizes(DEFAULTS); save(DEFAULTS); }, []);
+  const resetAll = useCallback(() => { setSizes(DEFAULTS); save(DEFAULTS); update(() => ({ order: [...PANE_IDS], hidden: [] })); }, [update]);
+  const sameSizes = (Object.keys(DEFAULTS) as (keyof Sizes)[]).every((k) => Math.abs(sizes[k] - DEFAULTS[k]) < 0.001);
+  const sameArr = arr.hidden.length === 0 && arr.order.every((id, i) => id === PANE_IDS[i]);
+  return { sizes, set, resetSizes, reset: resetAll, isDefault: sameSizes && sameArr, order: arr.order, hidden: arr.hidden, controls, setVisible };
 }
 
 /** A draggable, keyboard-operable divider. "vertical" = a vertical bar that changes widths. */
@@ -87,3 +134,34 @@ export function Splitter({ orientation, container, value, onChange, onReset, lab
 export const Cell = ({ grow, children }: { grow: number; children: ReactNode }) => (
   <div className="lcell" style={{ flex: `${grow} 1 0` }}>{children}</div>
 );
+
+/** The View menu: tick the panes you want to see. */
+export function ViewMenu({ hidden, onToggle, onReset, canReset }: { hidden: PaneId[]; onToggle: (id: PaneId, show: boolean) => void; onReset: () => void; canReset: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  return (
+    <div className="viewmenu" ref={box}>
+      <button className="tb" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(!open)} title="Choose which panes to show">
+        <Eye size={14} /><span>View</span>
+      </button>
+      {open && (
+        <div className="menu" role="group" aria-label="Show panes">
+          {PANE_IDS.map((id) => (
+            <label key={id}><input type="checkbox" checked={!hidden.includes(id)} onChange={(e) => onToggle(id, e.target.checked)} /> {PANE_NAMES[id]}</label>
+          ))}
+          <hr />
+          <button className="btn" onClick={() => { onReset(); setOpen(false); }} disabled={!canReset}><RotateCcw size={13} /> Put everything back</button>
+          <span className="muted">Drag a pane by its title to move it.</span>
+        </div>
+      )}
+    </div>
+  );
+}
