@@ -54,6 +54,11 @@ def texts(state):
     ("sendraw zz 01", "not an identifier"),
     ("sendraw 0x1 0g", "hex pairs"),
     ("start now", "does not take anything"),
+    ("wave A.B triangle 1 2", "Write it like: wave"),
+    ("wave A triangle 1 2 period 1s for 2s", "Message.Signal"),
+    ("wave A.B zigzag 1 2 period 1s for 2s", "Choose one of"),
+    ("wave A.B sine x 2 period 1s for 2s", "must be numbers"),
+    ("wave A.B sine 1 2 period 1s for 2s every 1ms", "faster than"),
 ])
 def test_mistakes_get_a_plain_message_with_the_line(text, fragment):
     with pytest.raises(ScriptError) as e:
@@ -386,5 +391,43 @@ def test_the_same_line_again_and_again_is_one_line_with_a_count(tmp_path):
         assert ("Sent VehicleSpeed (Speed=10)", 6) in lines
         assert lines.count(("Sent VehicleSpeed (Speed=10)", 6)) == 1 and ("after", 1) in lines
         assert all(o["t_last"] >= o["t"] for o in s["output"])
+    finally:
+        b.stop()
+
+
+def test_wave_shapes():
+    from core.script import wave_value
+    assert [wave_value("square", 0, 10, p) for p in (0.0, 0.49, 0.5, 0.99)] == [0, 0, 10, 10]
+    assert [wave_value("triangle", 0, 10, p) for p in (0.0, 0.25, 0.5, 0.75)] == [0, 5, 10, 5]
+    assert [wave_value("sawtooth", 0, 10, p) for p in (0.0, 0.5, 0.9)] == [0, 5, pytest.approx(9)]
+    assert wave_value("sine", 0, 10, 0.0) == pytest.approx(0) and wave_value("sine", 0, 10, 0.5) == pytest.approx(10)
+
+
+def test_wave_runs_and_stays_between_its_limits(tmp_path):
+    import cantools
+    db = cantools.database.load_file(DBC)
+    b, chan, r = make(tmp_path)
+    b.start()
+    p = can.Bus(interface="virtual", channel=chan)
+    try:
+        r.start("wave VehicleSpeed.Speed triangle 20 60 period 0.4s for 0.8s every 50ms")
+        assert wait_done(r)["ok"]
+        speeds = []
+        while (m := p.recv(0.1)) is not None:
+            speeds.append(db.decode_message(m.arbitration_id, m.data)["Speed"])
+        assert 12 <= len(speeds) <= 20, len(speeds)
+        assert min(speeds) >= 19.9 and max(speeds) <= 60.1 and max(speeds) - min(speeds) > 30, (min(speeds), max(speeds))
+    finally:
+        p.shutdown()
+        b.stop()
+
+
+def test_wave_needs_a_transmit_channel(tmp_path):
+    b, chan, r = make(tmp_path, listen_only=True)
+    b.start()
+    try:
+        r.start("wave VehicleSpeed.Speed sine 0 100 period 1s for 1s")
+        st = wait_done(r)
+        assert not st["ok"] and "listen-only" in (st["error"] or "").lower()
     finally:
         b.stop()

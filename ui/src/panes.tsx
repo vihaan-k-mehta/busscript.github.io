@@ -122,6 +122,7 @@ export function DataPane({ running, plotted, onPlot, fileKey }: { running: boole
   const tools = (
     <>
       <button className="tb" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}<span>{paused ? "Resume" : "Pause"}</span></button>
+      {!fileMode && <button className="tb" onClick={() => api("/api/signal-values/reset-peaks", "POST").catch(() => {})} title="Forget the lowest and highest values seen so far"><span>Reset peaks</span></button>}
       <span className="muted" style={{ marginLeft: "auto" }}>{vals.length} signals{fileMode ? " (at the end of the file)" : running ? "" : " (stopped)"}</span>
     </>
   );
@@ -131,7 +132,7 @@ export function DataPane({ running, plotted, onPlot, fileKey }: { running: boole
         <div className="empty">{cat.length === 0 ? (fileMode ? "No database attached. Open a DBC file (Open file) and the signals in this recording get their names." : "No database loaded. Attach a DBC file on the Setup tab to see signal values.") : "No decoded frames yet."}</div>
       ) : (
         <table className="tbl">
-          <thead><tr><th scope="col">Graph</th><th scope="col">Name</th><th scope="col">Value</th><th scope="col">Unit</th><th scope="col">Raw</th><th scope="col">Bar</th></tr></thead>
+          <thead><tr><th scope="col">Graph</th><th scope="col">Name</th><th scope="col">Value</th><th scope="col">Unit</th><th scope="col">Raw</th>{!fileMode && <><th scope="col">Lowest</th><th scope="col">Highest</th></>}<th scope="col">Bar</th></tr></thead>
           <tbody>
             {vals.map((r) => {
               const key = `${r.message}.${r.signal}`;
@@ -145,6 +146,7 @@ export function DataPane({ running, plotted, onPlot, fileKey }: { running: boole
                   <td className="mono">{String(r.value)}</td>
                   <td>{r.unit}</td>
                   <td className="mono">{r.raw ?? ""}</td>
+                  {!fileMode && <><td className="mono">{r.min ?? ""}</td><td className="mono">{r.max ?? ""}</td></>}
                   <td>{pct !== null && <div className="bar" role="presentation"><i style={{ width: `${pct}%` }} /></div>}</td>
                 </tr>
               );

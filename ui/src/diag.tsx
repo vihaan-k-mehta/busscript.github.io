@@ -77,7 +77,7 @@ export function DiagnosticsPage({ rev }: { rev: number }) {
   const tools = <button className="tb" onClick={load}><RefreshCw size={14} /><span>Refresh</span></button>;
   return (
     <div className="setup">
-      <Pane title="Diagnostics" tools={tools}>
+      <Pane className="wide" title="Diagnostics" tools={tools}>
         <p className="muted" style={{ margin: "0 0 8px" }}>
           Car diagnostics (OBD-II and UDS) and truck messages (J1939) in plain words. This lists the diagnostic conversations
           found in {res?.source === "file" ? "the open file" : "what is on the bus right now"}. Fault codes such as P0133 appear here with their status.

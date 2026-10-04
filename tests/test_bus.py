@@ -320,3 +320,34 @@ def test_state_reports_demo_flag():
     assert b.state()["demo"] is False        # a real session is never labelled demo
     b.demo = True
     assert b.state()["demo"] is True
+
+
+def test_peaks_catch_a_spike_between_reads(tmp_path):
+    import time
+    import uuid
+    from pathlib import Path
+    import can
+    import cantools
+    from core.bus import Bus
+    from core.models import ChannelConfig
+    dbc = str(Path(__file__).resolve().parents[1] / "samples" / "demo.dbc")
+    msg = cantools.database.load_file(dbc).get_message_by_name("VehicleSpeed")
+    b = Bus()
+    chan = f"k{uuid.uuid4().hex[:6]}"
+    b.set_channel(ChannelConfig(name="can1", interface="virtual", channel=chan))
+    b.load_database("can1", dbc)
+    b.start()
+    p = can.Bus(interface="virtual", channel=chan)
+    try:
+        for kmh in (40.0, 120.0, 41.0, 39.0):                  # the 120 is gone again by the next read
+            p.send(can.Message(arbitration_id=msg.frame_id, is_extended_id=msg.is_extended_frame, data=msg.encode({"Speed": kmh}, padding=False)))
+        end = time.time() + 3
+        while len(b.ring) < 4 and time.time() < end:
+            time.sleep(0.02)
+        row = next(r for r in b.signal_values() if r["signal"] == "Speed")
+        assert row["value"] == 39.0 and row["min"] == 39.0 and row["max"] == 120.0
+        b.reset_peaks()
+        assert next(r for r in b.signal_values() if r["signal"] == "Speed")["max"] is None
+    finally:
+        p.shutdown()
+        b.stop()

@@ -48,6 +48,7 @@ class Bus:
         self.filters: dict[str, FilterRule] = {}
         self.stats: dict[str, ChannelStats] = {}
         self._latest: dict[tuple[str, int, bool], Frame] = {}
+        self._peaks: dict[tuple[str, str, str], list[float]] = {}     # (channel, message, signal) -> [lowest, highest] seen
         self._watched: set[str] = set()
         self._history: dict[str, deque] = {}
         self._subs: list[Callable[[Frame], None]] = []
@@ -205,6 +206,7 @@ class Bus:
             with self._ring_lock:
                 self.ring.clear()
             self._latest.clear()
+            self._peaks.clear()
             self.dropped = 0
             self.running = True
             for name, bus in self._can.items():
@@ -286,6 +288,8 @@ class Bus:
         with self._ring_lock:
             self.ring.append(f)
         self._latest[(f.channel, f.can_id, f.ext)] = f
+        if m is not None and not f.error:
+            self._note_peaks(f, m)
         if m is not None and self._watched and not f.error:
             self._record_history(f, m)
         if self._writer is not None:
@@ -296,6 +300,23 @@ class Bus:
                     cb(f)
                 except Exception:
                     pass
+
+    def _note_peaks(self, f: Frame, m) -> None:
+        """Remember the lowest and highest value of every signal, so a very short spike is not missed between screen updates."""
+        try:
+            values = m.decode(f.data, decode_choices=False, allow_truncated=True)
+        except Exception:
+            return
+        for sig, v in values.items():
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                continue
+            pk = self._peaks.get((f.channel, m.name, sig))
+            if pk is None:
+                self._peaks[(f.channel, m.name, sig)] = [v, v]
+            elif v < pk[0]:
+                pk[0] = v
+            elif v > pk[1]:
+                pk[1] = v
 
     def _record_history(self, f: Frame, m) -> None:
         wanted = [s for s in m.signals if f"{m.name}.{s.name}" in self._watched]
@@ -368,9 +389,13 @@ class Bus:
         rows = []
         for (ch, fid, ext), f in list(self._latest.items()):
             for r in self.decode_frame(f):
-                rows.append({**r, "channel": ch, "ts": round(f.ts, 3)})
+                pk = self._peaks.get((ch, r["message"], r["signal"]))
+                rows.append({**r, "channel": ch, "ts": round(f.ts, 3), "min": pk[0] if pk else None, "max": pk[1] if pk else None})
         rows.sort(key=lambda r: (r["message"], r["signal"]))
         return rows
+
+    def reset_peaks(self) -> None:
+        self._peaks.clear()
 
     def current_signal(self, name: str):
         """Latest decoded value of 'Message.Signal', or None if it has not been seen yet."""

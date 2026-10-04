@@ -28,6 +28,10 @@ The Setup tab starts with **Check my setup**: it lists the libraries Busscript n
 
 The **Diagnostics** tab turns car and truck protocols into plain words: OBD-II (engine speed, coolant temperature, stored fault codes), UDS (read fault codes with their status, refusals with the reason) over ISO-TP including multi-frame messages, and J1939 message names. Selecting a frame in the Trace also shows what it means. Try `samples/demo_diag.asc`. Not included: flashing, security-key calculation, LIN, XCP/A2L, FIBEX.
 
+## Analyze: statistics, search and save
+
+The **Analyze** tab has three tools. The **statistics report** shows, for every message, how many frames there were and how regular they are (average spacing, spread, shortest, longest), for the open file or the live bus. **Find a frame** searches an open recording with a plain condition such as `id > 0x100 and d0 == 5` (id, dlc, time, dir, error, d0 to d63; join with `and` or `or`). **Save or convert** writes the data as CSV, ASC, BLF or MF4, only the frames you want, or only the time around frames that match a condition (a few seconds before and after each one, or from one condition to another). It can also write chosen signals to a spreadsheet table. Saved files can be downloaded from the same page. The Data pane also shows the lowest and highest value each signal reached, so a very short spike is not missed.
+
 ## Scripts
 
 The **Scripts** tab runs a short list of steps for you, one per line, with no programming needed. Pick an example, press Run, and read the results beside it:
@@ -39,7 +43,7 @@ end
 print Done
 ```
 
-Commands: `send`, `sendraw`, `wait`, `wait until`, `repeat`, `every`, `log start` / `log stop`, `print`, `start`, `stop`. Mistakes are explained with their line number. Scripts cannot run arbitrary code, they obey the same listen-only rule as everything else, and stop on their own after 30 minutes.
+Commands: `send`, `sendraw`, `wait`, `wait until`, `repeat`, `every`, `wave` (a signal that rises and falls by itself), `log start` / `log stop`, `print`, `start`, `stop`. Mistakes are explained with their line number. Scripts cannot run arbitrary code, they obey the same listen-only rule as everything else, and stop on their own after 30 minutes.
 
 Panes are resizable: drag a divider, or focus it and use the arrow keys (Shift for bigger steps, Home and End for the limits, Enter or double-click to reset). Sizes are remembered in the browser; the toolbar has Reset layout.
 

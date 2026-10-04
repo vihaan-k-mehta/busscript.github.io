@@ -47,6 +47,12 @@ def safe_name(filename: str) -> str:
     return base
 
 
+def safe_stem(name: str) -> str:
+    """A harmless file name (any extension is dropped by the caller) for files Busscript writes."""
+    base = SAFE_CHARS.sub("_", Path(name.replace("\\", "/")).name.strip().strip("."))[:100]
+    return base or "export"
+
+
 def unique_path(folder: Path, name: str) -> Path:
     p = folder / name
     n = 2

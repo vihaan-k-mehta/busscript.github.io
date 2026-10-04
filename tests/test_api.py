@@ -176,3 +176,54 @@ def test_describe_and_diagnostics(env):
     assert r["text"] == "Engine speed 1726 rpm"
     assert c.get("/api/describe", headers=H, params={"id": 1, "data": "zz"}).status_code == 400
     assert c.get("/api/diagnostics", headers=H).json() == {"source": "live", "messages": []}
+
+
+def test_statistics_find_and_export_on_an_open_file(env, tmp_path):
+    from pathlib import Path
+    c, bus, store = env
+    sample = Path(__file__).resolve().parents[1] / "samples" / "demo_drive.asc"
+    c.put("/api/files/demo_drive.asc", headers={**H, "Content-Type": "application/octet-stream"}, content=sample.read_bytes())
+    assert c.post("/api/files/open", headers=H, json={"name": "demo_drive.asc"}).status_code == 200
+
+    rep = c.get("/api/statistics/report", headers=H).json()
+    assert rep["source"] == "file" and rep["frames"] == 2130
+    eng = next(r for r in rep["rows"] if r["id"] == 0x100)
+    assert eng["count"] == 1500 and 15 < eng["mean_ms"] < 25 and eng["sd_ms"] is not None
+
+    hit = c.get("/api/file/find", headers=H, params={"cond": "id == 0x3A0"}).json()
+    assert hit["index"] is not None and hit["matches"] > 0
+    assert c.get("/api/file/find", headers=H, params={"cond": "nonsense"}).status_code == 400
+
+    r = c.post("/api/export", headers=H, json={"name": "cut", "format": "csv", "condition": "id == 0x100"}).json()
+    assert r["frames"] == 1500
+    body = c.get(f"/api/exports/{r['name']}", headers=H).text.splitlines()
+    assert body[0].startswith("time_s,channel,id") and len(body) == 1501
+    assert c.get("/api/exports/..%2F..%2Ftoken", headers=H).status_code == 404
+
+    r = c.post("/api/export", headers=H, json={"name": "around", "format": "asc", "trigger": "id == 0x3A0", "pre": 0.1, "post": 0.1}).json()
+    assert 0 < r["frames"] < 2130
+    assert any(x["name"] == r["name"] for x in c.get("/api/exports", headers=H).json())
+
+    for fmt in ("blf", "mf4"):
+        r = c.post("/api/export", headers=H, json={"name": "all", "format": fmt}).json()
+        assert r["frames"] == 2130 and r["size"] > 0
+
+    r = c.post("/api/export", headers=H, json={"name": "sig", "format": "signals", "signals": ["EngineData.EngineSpeed"]})
+    assert r.status_code == 400                      # no database attached yet: the plain-words message, not a crash
+    assert c.post("/api/export", headers=H, json={"format": "csv", "condition": "id == 0x7FF"}).status_code == 400
+
+
+def test_signal_table_export(env):
+    from pathlib import Path
+    c, bus, store = env
+    root = Path(__file__).resolve().parents[1] / "samples"
+    for n in ("demo_drive.asc", "demo.dbc"):
+        c.put(f"/api/files/{n}", headers={**H, "Content-Type": "application/octet-stream"}, content=(root / n).read_bytes())
+    c.post("/api/files/open", headers=H, json={"name": "demo.dbc"})
+    c.post("/api/files/open", headers=H, json={"name": "demo_drive.asc"})
+    r = c.post("/api/export", headers=H, json={"name": "sig", "format": "signals", "delimiter": ";",
+                                                "signals": ["EngineData.EngineSpeed", "VehicleSpeed.Speed"]})
+    assert r.status_code == 200, r.text
+    lines = c.get(f"/api/exports/{r.json()['name']}", headers=H).text.splitlines()
+    assert lines[0] == "time_s;EngineData.EngineSpeed;VehicleSpeed.Speed" and len(lines) > 100
+    assert c.post("/api/export", headers=H, json={"format": "signals", "signals": ["EngineData.EngineSpeed"], "delimiter": "x"}).status_code == 400

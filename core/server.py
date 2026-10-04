@@ -13,17 +13,18 @@ from typing import Optional
 
 import can
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from . import protocols
+from . import analysis, protocols
+from .export import FORMATS, write_frames, write_signals
 from .bus import Bus, BusError
 from .doctor import check as check_setup
 from .mcp_server import ALL_TOOLS, McpPolicy, build_mcp
 from .models import ChannelConfig, FilterRule, Frame
-from .files import MAX_UPLOAD, FileSession, kind_of, safe_name, supported_text, unique_path
+from .files import MAX_UPLOAD, safe_stem, FileSession, kind_of, safe_name, supported_text, unique_path
 from .script import TEMPLATES, ScriptError, ScriptLibrary, ScriptRunner, parse as parse_script
 from .store import Store
 
@@ -84,6 +85,18 @@ class ReplayIn(BaseModel):
     channel: Optional[str] = None
     speed: float = 1.0
     loop: bool = False
+
+
+class ExportIn(BaseModel):
+    name: str = "export"
+    format: str = "csv"                        # csv | asc | blf | mf4, or "signals" for a spreadsheet of signal values
+    condition: Optional[str] = None            # keep only frames matching this
+    trigger: Optional[str] = None              # keep only the time around frames matching this
+    trigger_end: Optional[str] = None          # toggle mode: until a frame matches this
+    pre: float = 0.0
+    post: float = 0.0
+    signals: list[str] = []                    # for format "signals": Message.Signal names (open file only)
+    delimiter: str = ","
 
 
 class OpenIn(BaseModel):
@@ -388,6 +401,81 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
         with bus._ring_lock:
             frames = list(bus.ring)
         return {"source": "live", "messages": protocols.assemble(frames)}
+
+    # ------------------------------------------------------------ statistics, search, export
+    def source_frames() -> tuple[str, list[Frame]]:
+        if fsession.view is not None:
+            return "file", fsession.view.frames
+        with bus._ring_lock:
+            return "live", list(bus.ring)
+
+    @app.post("/api/signal-values/reset-peaks")
+    def reset_peaks():
+        bus.reset_peaks()
+        return {"ok": True}
+
+    @app.get("/api/statistics/report")
+    def statistics_report():
+        src, frames = source_frames()
+        return {"source": src, "frames": len(frames), "rows": analysis.report(frames)}
+
+    @app.get("/api/file/find")
+    def file_find(cond: str, start: int = 0):
+        """The next frame in the open file matching a condition like 'id > 0x100 and d0 == 5'."""
+        frames = fsession.need().frames
+        index, total = analysis.find_matches(frames, analysis.parse_condition(cond), max(0, start))
+        return {"index": index, "matches": total}
+
+    exports_dir = store.data_dir / "exports"
+
+    def export_path(name: str, fmt: str) -> Path:
+        exports_dir.mkdir(parents=True, exist_ok=True)
+        stem = Path(safe_stem(name)).stem or "export"
+        return unique_path(exports_dir, stem + ("." + fmt if fmt in FORMATS else ".csv"))
+
+    @app.post("/api/export")
+    def export(b: ExportIn):
+        src, frames = source_frames()
+        if b.format == "signals":
+            fsession.need()
+            if not b.signals:
+                raise BusError("Choose at least one signal to save.")
+            path = export_path(b.name, "csv")
+            n = write_signals({n: fsession.series(n, 20000) for n in b.signals}, path, b.delimiter)
+            return {"name": path.name, "rows": n, "size": path.stat().st_size, "source": src}
+        if b.format not in FORMATS:
+            raise BusError("I can save as: " + ", ".join(FORMATS) + ", or signals.")
+        if b.trigger:
+            wins = analysis.trigger_windows(frames, analysis.parse_condition(b.trigger), b.pre, b.post,
+                                            analysis.parse_condition(b.trigger_end) if b.trigger_end else None)
+            frames = analysis.cut(frames, wins)
+        if b.condition:
+            keep = analysis.parse_condition(b.condition)
+            frames = [f for f in frames if keep(f)]
+        if not frames:
+            raise BusError("Nothing to save: no frames matched" + (" (no trigger happened)." if b.trigger else "."))
+        path = export_path(b.name, b.format)
+        n = write_frames(frames, path, b.format)
+        return {"name": path.name, "frames": n, "size": path.stat().st_size, "source": src}
+
+    @app.get("/api/exports")
+    def exports_list():
+        if not exports_dir.exists():
+            return []
+        return [{"name": p.name, "size": p.stat().st_size, "modified": p.stat().st_mtime}
+                for p in sorted(exports_dir.iterdir(), key=lambda p: -p.stat().st_mtime) if p.is_file()]
+
+    @app.get("/api/exports/{name}")
+    def exports_get(name: str):
+        p = exports_dir / Path(name).name
+        if not p.is_file() or p.parent != exports_dir:
+            raise HTTPException(404, "No such saved file.")
+        return FileResponse(p, filename=p.name)
+
+    @app.delete("/api/exports/{name}")
+    def exports_delete(name: str):
+        (exports_dir / Path(name).name).unlink(missing_ok=True)
+        return {"ok": True}
 
     @app.delete("/api/file")
     def file_close():

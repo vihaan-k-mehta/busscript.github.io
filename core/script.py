@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import difflib
 import operator
+import math
 import re
 import threading
 import time
@@ -25,7 +26,7 @@ from typing import Optional
 
 from .bus import Bus, BusError
 
-COMMANDS = ["start", "stop", "wait", "send", "sendraw", "repeat", "every", "end", "log", "print"]
+COMMANDS = ["start", "stop", "wait", "send", "sendraw", "repeat", "every", "wave", "end", "log", "print"]
 MAX_SECONDS = 1800        # a script is stopped after 30 minutes
 MAX_WAIT = 3600           # one wait, in seconds
 MAX_DEPTH = 4             # nested repeat / every blocks
@@ -61,6 +62,22 @@ class Step:
     line: int
     args: dict = field(default_factory=dict)
     body: Optional[list] = None
+
+
+SHAPES = ("square", "triangle", "sawtooth", "sine")
+
+
+def wave_value(shape: str, low: float, high: float, phase: float) -> float:
+    """Where in one cycle (phase 0 to 1) the wave is. Starts at low."""
+    if shape == "square":
+        k = 0.0 if phase < 0.5 else 1.0
+    elif shape == "triangle":
+        k = 1.0 - abs(2.0 * phase - 1.0)
+    elif shape == "sawtooth":
+        k = phase
+    else:
+        k = 0.5 - 0.5 * math.cos(2.0 * math.pi * phase)
+    return low + (high - low) * k
 
 
 # ---------------------------------------------------------------- parsing
@@ -167,6 +184,26 @@ def parse(text: str) -> list[Step]:
             if period < MIN_PERIOD:
                 raise ScriptError(n, f"'every' cannot be faster than every {int(MIN_PERIOD * 1000)}ms.")
             _open(stack, Step("every", n, {"period": period, "duration": _duration(args[2], n)}, []), n)
+        elif cmd == "wave":
+            args, ch = _split_channel(args)
+            usage = "Write it like: wave EngineData.EngineSpeed triangle 800 3000 period 4s for 20s   (shapes: " + ", ".join(SHAPES) + ")"
+            if len(args) not in (8, 10) or args[4].lower() != "period" or args[6].lower() != "for" or (len(args) == 10 and args[8].lower() != "every"):
+                raise ScriptError(n, usage)
+            msg, dot, sig = args[0].partition(".")
+            if not dot or not IDENT.match(msg) or not IDENT.match(sig):
+                raise ScriptError(n, f"'{args[0]}' should look like Message.Signal.")
+            if args[1].lower() not in SHAPES:
+                raise ScriptError(n, f"'{args[1]}' is not a shape I know. Choose one of: {', '.join(SHAPES)}.")
+            try:
+                low, high = float(args[2]), float(args[3])
+            except ValueError:
+                raise ScriptError(n, "The low and high values must be numbers. " + usage) from None
+            interval = _duration(args[9], n) if len(args) == 10 else 0.1
+            if interval < MIN_PERIOD:
+                raise ScriptError(n, f"'every' cannot be faster than every {int(MIN_PERIOD * 1000)}ms.")
+            cur.append(Step("wave", n, {"message": msg, "signal": sig, "shape": args[1].lower(), "low": low, "high": high,
+                                        "period": _duration(args[5], n), "duration": _duration(args[7], n),
+                                        "interval": interval, "channel": ch}))
         elif cmd == "end":
             if args:
                 raise ScriptError(n, "'end' does not take anything after it.")
@@ -360,6 +397,8 @@ class ScriptRunner:
                         if nxt < time.monotonic():
                             nxt = time.monotonic()      # fell behind: do not burst to catch up
                         self._sleep(nxt - time.monotonic(), s.line)
+                elif k == "wave":
+                    self._wave(s)
                 elif k == "log_start":
                     path = self.data_dir / "logs" / a["name"]
                     path.parent.mkdir(parents=True, exist_ok=True)
@@ -374,6 +413,24 @@ class ScriptRunner:
                     self._say(self._text(a["text"]))
             except BusError as e:
                 raise self._fail(s.line, e) from e
+
+    def _wave(self, s: Step) -> None:
+        a = s.args
+        ch = self._channel(a["channel"], s.line)
+        self._say(f"Sending a {a['shape']} wave on {a['message']}.{a['signal']} between {a['low']:g} and {a['high']:g}, "
+                  f"one cycle every {a['period']:g} s, for {a['duration']:g} s.")
+        t0 = time.monotonic()
+        nxt = t0
+        n = 0
+        while (t := time.monotonic() - t0) < a["duration"]:
+            value = wave_value(a["shape"], a["low"], a["high"], (t / a["period"]) % 1.0)
+            self.bus.send_signals(ch, a["message"], {a["signal"]: value})
+            n += 1
+            nxt += a["interval"]
+            if nxt < time.monotonic():
+                nxt = time.monotonic()
+            self._sleep(nxt - time.monotonic(), s.line)
+        self._say(f"Wave finished: {n} messages sent.")
 
     def _wait_until(self, s: Step) -> None:
         a = s.args
@@ -440,6 +497,9 @@ TEMPLATES = [
     {"id": "wait-high", "title": "Tell me when a value gets high",
      "about": "Waits (up to 30 seconds) until engine speed passes 3000, then says so.",
      "text": "# Works with the demo traffic. Use a signal from your own database as Message.Signal.\nprint Waiting for engine speed above 3000 rpm (up to 30 seconds)...\nwait until EngineData.EngineSpeed > 3000 timeout 30s\nprint Engine speed reached {EngineData.EngineSpeed} rpm\n"},
+    {"id": "wave", "title": "Make a signal rise and fall",
+     "about": "Sends engine speed as a triangle wave between 800 and 3000 rpm for 20 seconds.",
+     "text": "# A wave sends a signal that rises and falls on its own: square, triangle, sawtooth or sine.\n# One full cycle takes 'period'. Every 100ms is used unless you add: every 50ms\nwave EngineData.EngineSpeed triangle 800 3000 period 4s for 20s\n"},
     {"id": "steps", "title": "Step a value up and down",
      "about": "Switches the speed between 20 and 60 km/h, five times.",
      "text": "# Repeat the lines between 'repeat' and 'end' five times.\nrepeat 5\n  send VehicleSpeed Speed=20\n  wait 1s\n  send VehicleSpeed Speed=60\n  wait 1s\nend\nprint Finished stepping\n"},

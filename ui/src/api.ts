@@ -46,7 +46,7 @@ export interface Channel {
 export interface Frame { ts: number; ch: string; id: number; ext: boolean; fd: boolean; dir: "rx" | "tx"; dlc: number; data: string; error: boolean; name: string | null }
 export interface Stats { rx_frames: number; tx_frames: number; error_frames: number; rx_bytes: number; tx_bytes: number; load_pct: number; peak_load_pct: number; rx_rate: number; tx_rate: number }
 export interface BusState { demo?: boolean; running: boolean; elapsed: number; channels: number; frames_buffered: number; logging: null | { path: string; format: string; frames: number }; replay: null | { path: string; position: number }; cyclic: { id: string; channel: string; can_id: number; data: string; period_ms: number }[] }
-export interface SignalValue { channel: string; message: string; signal: string; value: number | string; unit: string; raw: number | null; ts: number }
+export interface SignalValue { channel: string; message: string; signal: string; value: number | string; unit: string; raw: number | null; ts: number; min?: number | null; max?: number | null }
 export interface CatalogueMsg { channel: string; id: number; ext: boolean; name: string; dlc: number; signals: { name: string; unit: string; min: number | null; max: number | null }[] }
 export interface Filter { id: string; mode: "pass" | "stop"; id_from: number; id_to: number; channel: string | null; ext: boolean; direction: "rx" | "tx" | "both"; enabled: boolean }
 

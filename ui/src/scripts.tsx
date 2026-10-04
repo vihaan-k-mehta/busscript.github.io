@@ -20,6 +20,7 @@ const COMMANDS: [string, string, string][] = [
   ["wait until", "Pause until a signal reaches a value, with an optional time limit", "wait until EngineData.EngineSpeed > 3000 timeout 30s"],
   ["repeat", "Do the steps up to the matching end, several times", "repeat 5 ... end"],
   ["every", "Do the steps over and over for a while", "every 100ms for 5s ... end"],
+  ["wave", "Send a signal that rises and falls by itself (square, triangle, sawtooth, sine)", "wave EngineData.EngineSpeed triangle 800 3000 period 4s for 20s"],
   ["log start / log stop", "Record everything on the bus to a file", "log start run1.asc"],
   ["print", "Write a note in the results. {Message.Signal} shows a live value", "print Speed is {VehicleSpeed.Speed}"],
   ["start / stop", "Start or stop the measurement", "start"],
