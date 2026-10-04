@@ -150,7 +150,7 @@ def test_a_failed_open_keeps_the_previous_file(session):
 
 def test_unsupported_types_and_unsafe_names():
     assert kind_of("x.mf4") == "log" and kind_of("X.DBC") == "database" and kind_of("x.exe") is None
-    for bad in ["virus.exe", "notes.txt", "noextension", ".asc", ""]:
+    for bad in ["virus.exe", "notes.docx", "noextension", ".asc", ""]:
         with pytest.raises(BusError, match="cannot open"):
             safe_name(bad)
     assert safe_name("..\\..\\Windows\\drive 1.asc") == "drive 1.asc"
@@ -300,3 +300,25 @@ def test_diagnostic_sample_is_understood(tmp_path):
     assert "Engine speed 1726 rpm" in texts
     assert any(t.startswith("Fault codes") for t in texts)
     assert any(t.startswith("No: Security access") for t in texts)
+
+
+CANDUMP = ("(1594702589.999073) can1 18F11031#0000FFFFFFFFFFFF\n(1594702590.000001) can1 0CF00400#0E7D7D0000000F7D\n"
+           "(1594702590.020000) can1 0CF00400#0E7D7D0000000F7E\n")
+
+
+def test_candump_saved_as_txt_opens(tmp_path):
+    from core.files import read_log
+    p = tmp_path / "truck.txt"
+    p.write_text(CANDUMP)
+    v = read_log(p, "truck.txt", lambda n: "CAN1")
+    assert len(v.frames) == 3 and v.format == "candump log"
+    assert v.frames[1].can_id == 0x0CF00400 and v.frames[1].ext is True
+
+
+def test_other_text_files_are_refused_kindly(tmp_path):
+    from core.bus import BusError
+    from core.files import read_log
+    p = tmp_path / "notes.txt"
+    p.write_text("shopping list\neggs\n")
+    with pytest.raises(BusError, match="not a candump log"):
+        read_log(p, "notes.txt", lambda n: "CAN1")

@@ -46,3 +46,13 @@ def test_multiframe_uds_fault_code_report():
 
 def test_unrelated_frames_are_ignored():
     assert describe(0x123, False, b"\1\2\3") is None
+
+
+def test_more_j1939_names_and_manufacturer_ranges():
+    from core import protocols
+    # taken from a real truck recording: these were unnamed before
+    assert "Transmission controller 1" in protocols.describe_j1939(0x0CF00203)
+    assert "Engine controller 3" in protocols.describe_j1939(0x18FEDF00)
+    assert "Manufacturer-specific (proprietary B)" in protocols.describe_j1939(0x18FF1234)
+    assert protocols.describe(0x18FF1234, True, b"\0") is not None
+    assert protocols.pgn_name(0x1234) is None

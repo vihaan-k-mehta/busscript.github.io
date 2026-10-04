@@ -13,7 +13,22 @@ PGN_NAMES = {
     65260: "Vehicle identification", 65262: "Engine temperature 1", 65263: "Engine fluid level and pressure",
     65265: "Cruise control and vehicle speed", 65266: "Fuel economy", 65269: "Ambient conditions", 65270: "Inlet and exhaust conditions",
     65271: "Vehicle electrical power",
+    0: "Torque and speed control 1 (TSC1)", 61440: "Retarder controller 1 (ERC1)", 61441: "Brake controller 1 (EBC1)",
+    61442: "Transmission controller 1 (ETC1)", 61445: "Transmission controller 2 (ETC2)", 65247: "Engine controller 3 (EEC3)",
+    65217: "Vehicle distance, high resolution", 65215: "Wheel speeds", 65257: "Fuel consumption", 65272: "Transmission fluids",
+    65276: "Dash display",
 }
+
+
+def pgn_name(pgn: int) -> Optional[str]:
+    """The standard name of a J1939 message, or the range it falls in (manufacturers use these for their own messages)."""
+    if pgn in PGN_NAMES:
+        return PGN_NAMES[pgn]
+    if pgn in (61184, 126720):
+        return "Manufacturer-specific (proprietary A)"
+    if 65280 <= pgn <= 65535:
+        return "Manufacturer-specific (proprietary B)"
+    return None
 
 
 def j1939_parts(can_id: int) -> dict:
@@ -28,7 +43,7 @@ def j1939_parts(can_id: int) -> dict:
 
 def describe_j1939(can_id: int) -> str:
     p = j1939_parts(can_id)
-    name = PGN_NAMES.get(p["pgn"])
+    name = pgn_name(p["pgn"])
     text = f"J1939 PGN {p['pgn']}" + (f" ({name})" if name else "")
     text += f", from address {p['source']}"
     if p["destination"] is not None:
@@ -157,7 +172,7 @@ def describe(can_id: int, ext: bool, data: bytes) -> Optional[str]:
         if pci == 3:
             return "Flow control: " + {0: "go on", 1: "wait", 2: "overflow"}.get(data[0] & 0xF, "?")
         return None
-    if ext and not is_diag_id(can_id, ext) and j1939_parts(can_id)["pgn"] in PGN_NAMES:
+    if ext and not is_diag_id(can_id, ext) and pgn_name(j1939_parts(can_id)["pgn"]):
         return describe_j1939(can_id)
     return None
 

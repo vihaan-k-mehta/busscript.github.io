@@ -5,7 +5,7 @@ import { Modal, type Notify } from "./ui";
 
 export interface Busy { text: string; pct?: number }
 
-const ACCEPT = ".asc,.blf,.mf4,.mdf,.log,.trc,.csv,.db,.dbc,.kcd,.sym,.arxml,.cdd";
+const ACCEPT = ".asc,.blf,.mf4,.mdf,.log,.txt,.trc,.csv,.db,.dbc,.kcd,.sym,.arxml,.cdd";
 const isDb = (n: string) => /\.(dbc|kcd|sym|arxml|cdd)$/i.test(n);
 
 const fmtSize = (b: number) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -69,7 +69,7 @@ export function OpenFileDialog({ open, onClose, onPick, onOpenStored, notify }: 
           onChange={(e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; if (fs.length) { onClose(); onPick(fs); } }} />
       </label>
       <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-        Recordings: ASC, BLF, MF4 (MDF4), candump .log, PEAK .trc, CSV, SQLite .db. Databases: DBC, KCD, SYM, ARXML, CDD.
+        Recordings: ASC, BLF, MF4 (MDF4), candump .log or .txt, PEAK .trc, CSV, SQLite .db. Databases: DBC, KCD, SYM, ARXML, CDD.
         {formats ? "" : ""} MF4 files must contain recorded CAN frames.
       </p>
       <div>

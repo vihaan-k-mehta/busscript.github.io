@@ -19,7 +19,7 @@ from .models import Frame
 
 MAX_FRAMES = 1_000_000
 MAX_UPLOAD = 1024 * 1024 * 1024          # 1 GiB
-LOG_EXTS = {".asc": "Vector ASC", ".blf": "Vector BLF", ".mf4": "MDF4", ".mdf": "MDF4", ".log": "candump log",
+LOG_EXTS = {".asc": "Vector ASC", ".blf": "Vector BLF", ".mf4": "MDF4", ".mdf": "MDF4", ".log": "candump log", ".txt": "candump log",
             ".trc": "PEAK trace", ".csv": "CSV", ".db": "SQLite log"}
 DB_EXTS = {".dbc": "DBC", ".kcd": "KCD", ".sym": "SYM", ".arxml": "ARXML", ".cdd": "CDD"}
 SAFE_CHARS = re.compile(r"[^A-Za-z0-9._ -]")
@@ -87,6 +87,18 @@ class FileView:
         }
 
 
+_CANDUMP_LINE = re.compile(r"^\(\d+\.\d+\)\s+\S+\s+[0-9A-Fa-f]+(#|##)")
+
+
+def _looks_like_candump(path: Path) -> bool:
+    try:
+        with open(path, "r", encoding="ascii", errors="ignore") as f:
+            lines = [ln for ln in (f.readline() for _ in range(5)) if ln.strip()]
+    except OSError:
+        return False
+    return bool(lines) and all(_CANDUMP_LINE.match(ln) for ln in lines)
+
+
 def read_log(path: Path, display: str, channel_for: Callable[[Optional[int]], str]) -> FileView:
     """Read any log python-can understands. channel_for maps the file's channel number to a Busscript channel name."""
     ext = path.suffix.lower()
@@ -101,7 +113,13 @@ def read_log(path: Path, display: str, channel_for: Callable[[Optional[int]], st
     view = FileView(name=display, path=str(path), format=LOG_EXTS[ext])
     first: Optional[float] = None
     try:
-        reader = can.LogReader(read_path)
+        if ext == ".txt":                  # candump logs are often saved as .txt: accept the file only if it really is one
+            if not _looks_like_candump(path):
+                raise BusError(f"'{path.name}' is a text file, but not a candump log (lines like "
+                               "'(1594702589.999073) can0 18F11031#0000FFFFFFFFFFFF').")
+            reader = can.io.CanutilsLogReader(read_path)
+        else:
+            reader = can.LogReader(read_path)
         try:
             for msg in reader:
                 view.total_read += 1
