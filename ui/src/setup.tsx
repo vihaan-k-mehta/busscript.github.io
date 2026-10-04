@@ -1,3 +1,4 @@
+import { SetupCheck } from "./diag";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Send, Square, Play, Circle } from "lucide-react";
 import { api, type BusState, type Channel, type Filter } from "./api";
@@ -61,6 +62,7 @@ export function SetupPage({ channels, state, refresh, notify, onImport }: { chan
 
   return (
     <div className="setup">
+      <SetupCheck />
       <section className="card" aria-labelledby="h-ch">
         <h3 id="h-ch">Channels</h3>
         <div className="cb">

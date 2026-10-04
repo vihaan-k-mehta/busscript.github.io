@@ -1,3 +1,4 @@
+import { Meaning } from "./diag";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileText } from "lucide-react";
@@ -51,6 +52,8 @@ export function FileTracePane({ info, hex, rev }: { info: FileSummary; hex: bool
   }, [firstIdx, lastIdx, key, total, query]);
 
   const rowAt = (i: number) => cache.current.get(`${key}|${Math.floor(i / BLOCK)}`)?.[i % BLOCK];
+
+  const selRow = sel !== null ? rowAt(sel) : undefined;
 
   const pick = async (i: number, f: Frame) => {
     setSel(i);
@@ -125,6 +128,7 @@ export function FileTracePane({ info, hex, rev }: { info: FileSummary; hex: bool
         </div>
         {decoded && sel !== null && (
           <div className="decoded" style={{ position: "static", flex: "none" }} aria-live="polite">
+            {selRow && <Meaning id={selRow.id} ext={selRow.ext} data={selRow.data} />}
             {decoded.length === 0 ? <span className="muted">No database entry for this ID. Attach a database file to see signal values.</span>
               : decoded.map((s) => <span key={s.signal} style={{ marginRight: 16 }}>{s.signal} = <b>{String(s.value)}</b> {s.unit}</span>)}
           </div>

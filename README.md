@@ -22,6 +22,12 @@ Press **Open file** (or drag a file onto the window). Busscript opens MF4 (MDF4)
 
 MF4 files must contain recorded CAN frames. Files that hold only already-decoded signals are not supported. MF4 was tested with files Busscript itself wrote, not with files from other loggers. Recordings are loaded into memory, up to one million frames.
 
+## Check my setup and diagnostics
+
+The Setup tab starts with **Check my setup**: it lists the libraries Busscript needs (installed for you by `start.bat`) and which adapter drivers are on this PC (PEAK PCAN, Vector, Kvaser, IXXAT, National Instruments, Intrepid, SYS TEC). Driver packages come from the adapter maker and cannot be bundled; the card says which one to install. Serial adapters (SLCAN, CANable, Arduino) need no driver from us.
+
+The **Diagnostics** tab turns car and truck protocols into plain words: OBD-II (engine speed, coolant temperature, stored fault codes), UDS (read fault codes with their status, refusals with the reason) over ISO-TP including multi-frame messages, and J1939 message names. Selecting a frame in the Trace also shows what it means. Try `samples/demo_diag.asc`. Not included: flashing, security-key calculation, LIN, XCP/A2L, FIBEX.
+
 ## Scripts
 
 The **Scripts** tab runs a short list of steps for you, one per line, with no programming needed. Pick an example, press Run, and read the results beside it:

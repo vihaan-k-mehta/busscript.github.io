@@ -18,7 +18,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from . import protocols
 from .bus import Bus, BusError
+from .doctor import check as check_setup
 from .mcp_server import ALL_TOOLS, McpPolicy, build_mcp
 from .models import ChannelConfig, FilterRule, Frame
 from .files import MAX_UPLOAD, FileSession, kind_of, safe_name, supported_text, unique_path
@@ -364,6 +366,28 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
     @app.get("/api/file")
     def file_summary():
         return fsession.summary()
+
+    # ------------------------------------------------------------ setup check and protocol meanings
+    @app.get("/api/doctor")
+    def doctor():
+        return check_setup(store.data_dir)
+
+    @app.get("/api/describe")
+    def describe_frame(id: int, ext: bool = False, data: str = ""):
+        try:
+            raw = bytes.fromhex(data.replace(" ", ""))
+        except ValueError:
+            raise HTTPException(400, "data must be hex bytes, like 01 02 03")
+        return {"text": protocols.describe(id, ext, raw)}
+
+    @app.get("/api/diagnostics")
+    def diagnostics():
+        """Whole diagnostic (OBD-II / UDS) messages found in the open file, or else in the live buffer."""
+        if fsession.view is not None:
+            return {"source": "file", "messages": protocols.assemble(fsession.view.frames)}
+        with bus._ring_lock:
+            frames = list(bus.ring)
+        return {"source": "live", "messages": protocols.assemble(frames)}
 
     @app.delete("/api/file")
     def file_close():

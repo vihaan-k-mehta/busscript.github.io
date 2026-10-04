@@ -1,3 +1,4 @@
+import { Meaning } from "./diag";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import uPlot from "uplot";
@@ -85,6 +86,7 @@ export function TracePane({ hex }: { hex: boolean }) {
       </div>
       {selected && expanded[sel!] && (
         <div className="decoded" style={{ position: "static", flex: "none" }} aria-live="polite">
+          <Meaning id={selected.id} ext={selected.ext} data={selected.data} />
           {expanded[sel!].length === 0 ? <span className="muted">No database entry for this ID.</span> :
             expanded[sel!].map((s) => <span key={s.signal} style={{ marginRight: 16 }}>{s.signal} = <b>{String(s.value)}</b> {s.unit}</span>)}
         </div>

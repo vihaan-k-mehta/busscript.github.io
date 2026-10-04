@@ -6,6 +6,7 @@ import { DataPane, GraphicPane, StatPane, TracePane, WritePane, type LogLine } f
 import { SetupPage } from "./setup";
 import { McpDialog } from "./mcp";
 import { ScriptsPage } from "./scripts";
+import { DiagnosticsPage } from "./diag";
 import { DesignPage } from "./design";
 import { Toast, type Notify } from "./ui";
 import { Cell, Splitter, useLayout } from "./layout";
@@ -15,7 +16,7 @@ import { FileInfoPane, FileTracePane } from "./filepane";
 export function App() {
   const lv = useLive();
   const [route, setRoute] = useState(location.hash);
-  const [tab, setTab] = useState<"Setup" | "Measurement" | "Scripts">("Measurement");
+  const [tab, setTab] = useState<"Setup" | "Measurement" | "Scripts" | "Diagnostics">("Measurement");
   const [hex, setHex] = useState(true);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [state, setState] = useState<BusState | null>(null);
@@ -173,6 +174,8 @@ export function App() {
       <main className="content">
         {tab === "Setup" ? (
           <SetupPage channels={channels} state={state} refresh={refresh} notify={notify} onImport={pickFiles} />
+        ) : tab === "Diagnostics" ? (
+          <DiagnosticsPage rev={fileRev + (fileInfo?.frames ?? 0)} />
         ) : tab === "Scripts" ? (
           <ScriptsPage state={state} notify={notify} />
         ) : (
@@ -196,7 +199,7 @@ export function App() {
         )}
       </main>
       <div className="tabs" role="tablist" aria-label="View">
-        {(["Setup", "Measurement", "Scripts"] as const).map((t) => (
+        {(["Setup", "Measurement", "Scripts", "Diagnostics"] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>

@@ -159,3 +159,20 @@ def test_schema_ships_inside_the_package():
     from core import store
     assert store.SCHEMA.exists()
     assert store.SCHEMA.parent == Path(store.__file__).resolve().parent
+
+
+def test_doctor_reports_libraries(env):
+    c, *_ = env
+    r = c.get("/api/doctor", headers=H).json()
+    assert r["ready"] is True and r["data_dir_writable"] is True
+    assert {x["name"] for x in r["libraries"]} >= {"python-can", "asammdf", "pyserial"}
+    assert any(d["interface"] == "pcan" for d in r["drivers"])
+    assert c.get("/api/doctor").status_code == 401
+
+
+def test_describe_and_diagnostics(env):
+    c, bus, _ = env
+    r = c.get("/api/describe", headers=H, params={"id": 0x7E8, "data": "04 41 0C 1A F8"}).json()
+    assert r["text"] == "Engine speed 1726 rpm"
+    assert c.get("/api/describe", headers=H, params={"id": 1, "data": "zz"}).status_code == 400
+    assert c.get("/api/diagnostics", headers=H).json() == {"source": "live", "messages": []}

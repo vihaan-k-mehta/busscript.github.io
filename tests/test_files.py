@@ -286,3 +286,17 @@ def test_filter_by_message_and_seek(session):
     assert 1.0 <= fs.frame_dicts(i, 1)[0]["ts"] < 1.05 and fs.frame_dicts(i - 1, 1)[0]["ts"] < 1.0
     j = fs.seek(1.0, can_id=0x200)
     assert fs.frame_dicts(j, 1, can_id=0x200)[0]["ts"] >= 1.0
+
+
+def test_diagnostic_sample_is_understood(tmp_path):
+    from pathlib import Path
+    from core.protocols import assemble
+    from core.bus import Bus
+    from core.files import FileSession
+    fs = FileSession(Bus(), tmp_path)
+    src = Path(__file__).resolve().parents[1] / "samples" / "demo_diag.asc"
+    assert fs.open(src, "demo_diag.asc")["frames"] == 14
+    texts = [m["text"] for m in assemble(fs.view.frames)]
+    assert "Engine speed 1726 rpm" in texts
+    assert any(t.startswith("Fault codes") for t in texts)
+    assert any(t.startswith("No: Security access") for t in texts)
