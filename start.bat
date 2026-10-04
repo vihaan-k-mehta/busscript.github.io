@@ -1,10 +1,21 @@
 @echo off
 rem Busscript launcher for Windows.
-rem   start.bat         demo bus with synthetic traffic (no hardware needed)
-rem   start.bat live    your own channels and adapters
+rem   start.bat         first time: a demo bus with synthetic traffic. Once you have added a channel, your own channels.
+rem   start.bat live    never show the demo, only your own channels
+rem   start.bat demo    always the demo
 rem Any other arguments are passed to the program, for example: start.bat --demo --port 9000
 setlocal
 cd /d "%~dp0"
+
+echo %~dp0 | find /i "\Temp\" >nul && (
+  echo.
+  echo This looks like a temporary folder, probably because the zip was opened without extracting it.
+  echo Right-click the zip, choose Extract All, move the folder somewhere permanent, and run start.bat from there.
+  echo Running it from here would reinstall everything every time.
+  echo.
+  pause
+  exit /b 1
+)
 
 set "PY="
 for %%C in (python py) do (
@@ -34,9 +45,11 @@ if errorlevel 1 (
 )
 
 if "%~1"=="" (
-  set "ARGS=--demo"
-) else if /i "%~1"=="live" (
   set "ARGS="
+) else if /i "%~1"=="live" (
+  set "ARGS=--live"
+) else if /i "%~1"=="demo" (
+  set "ARGS=--demo"
 ) else (
   set "ARGS=%*"
 )

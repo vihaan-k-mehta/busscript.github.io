@@ -227,3 +227,19 @@ def test_signal_table_export(env):
     lines = c.get(f"/api/exports/{r.json()['name']}", headers=H).text.splitlines()
     assert lines[0] == "time_s;EngineData.EngineSpeed;VehicleSpeed.Speed" and len(lines) > 100
     assert c.post("/api/export", headers=H, json={"format": "signals", "signals": ["EngineData.EngineSpeed"], "delimiter": "x"}).status_code == 400
+
+
+def test_leaving_the_demo_removes_its_channel_and_traffic(env):
+    import threading
+    from core.demo import start_demo_traffic
+    from core.models import ChannelConfig
+    c, bus, _ = env
+    bus.set_channel(ChannelConfig(name="demo", interface="virtual", channel="demo-x", listen_only=False))
+    bus.demo_stop = start_demo_traffic("demo-x")
+    bus.demo = True
+    assert c.get("/api/state", headers=H).json()["demo"] is True
+    r = c.post("/api/demo/off", headers=H)
+    assert r.status_code == 200 and r.json()["demo"] is False
+    assert c.get("/api/channels", headers=H).json() == []
+    assert bus.demo_stop.is_set()
+    assert c.post("/api/demo/off", headers=H).status_code == 200      # harmless when already off

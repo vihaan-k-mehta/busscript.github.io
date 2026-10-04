@@ -6,11 +6,17 @@ A local CAN bus tool you can script: REST and an MCP server alongside a live UI.
 
 Busscript is for **Windows**. You need **Python 3.11 or newer** from python.org (tick "Add python.exe to PATH"). Tested on Windows 11 with Python 3.12.
 
-1. Download and unzip this repository.
+**Easiest:** download `Busscript.exe` from the Releases page and double-click it. No Python needed. Windows may warn that the publisher is unknown because the program is not code-signed (More info, then Run anyway).
+
+**From source (for developers):** the steps below. They need Python.
+
+1. Download the zip and use *Extract All* (do not run it from inside the zip).
 2. Double-click `start.bat`.
 3. The first run sets up a private environment and installs the libraries (about a minute, needs internet, once). Then your browser opens on a demo bus with synthetic traffic, so you can try everything without hardware.
 
-For your own adapters run `start.bat live`, then add a channel on the Setup tab. Node.js is not needed: the UI is already built (`ui/dist`).
+To use your own adapter press **Use my own adapter** in the demo banner and add a channel on the Setup tab. After you have added a channel, Busscript starts on your channels instead of the demo. `start.bat live` never shows the demo, `start.bat demo` always does.
+
+Build the exe yourself with `pip install pyinstaller` then `python scripts/make_exe.py` (needs the built UI). Node.js is not needed: the UI is already built (`ui/dist`).
 
 Open the link that is printed in the window; it contains your access token.
 

@@ -56,7 +56,7 @@
     <section id="top" aria-labelledby="h-hero">
       <h1 id="h-hero">Script your CAN bus.</h1>
       <p class="lead">Busscript is a live CAN bus analyzer with a REST API and an MCP server. Your scripts, CI jobs and AI assistants can read a signal by name and send a frame, with no plugin and no Windows-only COM server.</p>
-      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/archive/refs/heads/main.zip">Download (zip)</a><a class="btn secondary" href="#start">How to run it</a>
+      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/releases/latest/download/Busscript.exe">Download for Windows (.exe)</a><a class="btn secondary" href="#start">How to run it</a>
       <figure>
         <img class="shot" src="img/measurement.png" width="1440" height="849" alt="The Busscript Measurement view with a live frame trace, decoded signal values, bus statistics, a signal plot and an event log, running on the built-in demo bus.">
         <figcaption>The Measurement view on the built-in demo bus: no hardware needed to try it.</figcaption>
@@ -109,16 +109,14 @@
     <section id="start" aria-labelledby="h-start">
       <h2 id="h-start">Download and run</h2>
       <ol class="steps">
-        <li><strong>Install Python 3.11 or newer</strong> from <a href="https://www.python.org/downloads/">python.org</a> if you do not have it. Tick "Add python.exe to PATH".</li>
-        <li><strong><a href="https://github.com/vihaan-k-mehta/busscript.github.io/archive/refs/heads/main.zip">Download the zip</a></strong> and unzip it anywhere.</li>
-        <li><strong>Double-click <code>start.bat</code></strong>. The first run sets itself up in a few minutes and needs internet once. Your browser then opens on a demo bus with synthetic traffic, so you can try everything with no hardware.</li>
+        <li><strong><a href="https://github.com/vihaan-k-mehta/busscript.github.io/releases/latest/download/Busscript.exe">Download Busscript.exe</a></strong> (about 56 MB) and double-click it. Nothing to install: no Python, no libraries. Your browser opens on a demo bus with synthetic traffic, so you can try everything with no hardware. Windows may say the publisher is unknown, because the program is not code-signed: choose More info, then Run anyway.</li>
         <li><strong>Try a recording:</strong> press <strong>Open file</strong> and choose <code>samples/demo_drive.mf4</code>, or drag any log onto the window.</li>
-        <li><strong>Use your own adapter:</strong> run <code>start.bat live</code>, add a channel on the Setup tab and attach a DBC file.</li>
+        <li><strong>Use your own adapter:</strong> press <strong>Use my own adapter</strong> in the demo banner, add a channel on the Setup tab and attach a DBC file. Next time it starts on your channels, not the demo.</li>
         <li><strong>Drive it from code:</strong> call the REST API, or switch on MCP and connect your assistant.</li>
       </ol>
       <pre tabindex="0" aria-label="Example commands"><code>TOKEN=$(cat ~/busscript-data/token)
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"channel":"demo","message":"VehicleSpeed","signals":{"Speed":42.5}}'   http://127.0.0.1:8765/api/transmit/signal</code></pre>
-      <p>The README has the MCP tool list, the safety notes and a runnable Python example. The source is on <a href="https://github.com/vihaan-k-mehta/busscript.github.io">GitHub</a>.</p>
+      <p>The README has the MCP tool list, the safety notes and a runnable Python example. Developers can build from source: the code is on <a href="https://github.com/vihaan-k-mehta/busscript.github.io">GitHub</a>.</p>
     </section>
 
     <section aria-labelledby="h-price">
@@ -132,7 +130,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
     <section aria-labelledby="h-limits">
       <h2 id="h-limits">What it is not yet</h2>
       <ul class="limits">
-        <li>Windows only. The code is plain Python, but there is no launcher for other systems and nothing has been tried on them. Only Python 3.12 has been tested.</li>
+        <li>Windows only. Nothing has been tried on other systems.</li>
         <li>Only the virtual bus has been tested. Real adapters should work through python-can but have not been tried here.</li>
         <li>Logs are tested with files Busscript wrote itself, not with files exported by other tools.</li>
         <li>CAN and CAN FD only: no LIN, J1939 decoding, diagnostics or FlexRay.</li>
@@ -145,7 +143,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 
     <section id="faq" aria-labelledby="h-faq">
       <h2 id="h-faq">Questions</h2>
-      <details><summary>What do I need installed?</summary><p>Windows, Python 3.11 or newer, and internet access the first time so it can fetch its libraries (a few minutes). You do not need Node.js: the interface is already built.</p></details>
+      <details><summary>What do I need installed?</summary><p>Nothing. Busscript.exe is a single file for Windows 10 or 11: no Python, no libraries, no internet needed after the download. For a real CAN adapter you may need the adapter maker's driver; the Setup tab has a check that says which.</p></details>
       <details><summary>Which CAN adapters work?</summary><p>Any interface python-can supports, such as SocketCAN, PCAN and serial-line adapters. Only the built-in virtual bus has been tested so far. Hardware that needs a vendor driver needs that driver installed.</p></details>
       <details><summary>Is it safe to let an AI assistant send frames?</summary><p>It is your call, and the defaults assume caution. MCP is off, MCP transmit is a second switch that is off, channels are listen-only, and transmits are rate-limited. Sending onto a real vehicle bus can affect real equipment, so keep it off on a live vehicle unless you mean it.</p></details>
       <details><summary>Can bus data trick an assistant?</summary><p>Frame contents and database names come from other devices and files, so Busscript returns them as structured data and tells the assistant to treat them as data. Sending still needs your switch.</p></details>
@@ -157,7 +155,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
     <section aria-labelledby="h-final">
       <h2 id="h-final">Try it without hardware</h2>
       <p class="lead">One command starts a demo bus. Then point a script at it.</p>
-      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/archive/refs/heads/main.zip">Download (zip)</a>
+      <a class="btn" href="https://github.com/vihaan-k-mehta/busscript.github.io/releases/latest/download/Busscript.exe">Download for Windows (.exe)</a>
     </section>
   </main>
 

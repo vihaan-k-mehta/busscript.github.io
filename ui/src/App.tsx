@@ -120,6 +120,14 @@ export function App() {
     finally { setBusy(null); }
   }, [notify, opened]);
 
+  const leaveDemo = async () => {
+    try {
+      await api("/api/demo/off", "POST");
+      await refresh();
+      setTab("Setup");
+      notify("Demo stopped. Add your adapter as a channel below.");
+    } catch (e) { notify((e as Error).message, "error"); }
+  };
   const closeFile = async () => { try { await api("/api/file", "DELETE"); setFileInfo(null); } catch (e) { notify((e as Error).message, "error"); } };
 
   // dragging a file anywhere onto the window opens it
@@ -164,7 +172,7 @@ export function App() {
           {state?.replay ? "Replaying · " : ""}{state?.logging ? "Logging · " : ""}{running ? `${state?.elapsed.toFixed(0)} s` : "Stopped"}
         </span>
       </div>
-      {state?.demo && !fileInfo && <div className="banner demo" role="status"><strong>Demo data.</strong> This is synthetic traffic from a built-in test bus, not a real CAN bus. To use your own adapter, close this and run <code>start.bat live</code>.</div>}
+      {state?.demo && !fileInfo && <div className="banner demo" role="status"><span><strong>Demo data.</strong> This is synthetic traffic from a built-in test bus, not a real CAN bus. Ready for a real adapter?</span> <button className="btn" onClick={leaveDemo}>Use my own adapter</button></div>}
       {fileInfo && (
         <div className="banner file" role="status">
           <span><strong>Viewing a file:</strong> {fileInfo.name} ({fileInfo.format}, {fileInfo.frames.toLocaleString()} frames, {fileInfo.duration} s). This is a recording, not live data.</span>

@@ -409,6 +409,11 @@ def create_app(bus: Bus, store: Store, token: str) -> FastAPI:
         with bus._ring_lock:
             return "live", list(bus.ring)
 
+    @app.post("/api/demo/off")
+    def demo_off():
+        bus.end_demo()
+        return bus.state()
+
     @app.post("/api/signal-values/reset-peaks")
     def reset_peaks():
         bus.reset_peaks()

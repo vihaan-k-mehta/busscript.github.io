@@ -20,6 +20,7 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--data-dir", type=Path, default=None)
     ap.add_argument("--demo", action="store_true", help="virtual bus with synthetic traffic and the sample DBC")
+    ap.add_argument("--live", action="store_true", help="never start the demo; use only your own channels")
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--mcp-stdio", action="store_true", help="serve MCP over stdio instead of the web app")
     args = ap.parse_args()
@@ -33,11 +34,13 @@ def main() -> None:
                 bus.load_database(cfg.name, d)
             except Exception:
                 pass
-    if args.demo:
+    saved = store.load_channels()
+    use_demo = args.demo or (not args.live and not saved)   # first run with nothing set up: show the demo
+    if use_demo:
         cfg = ChannelConfig(name="demo", interface="virtual", channel="demo0", listen_only=False)
         bus.set_channel(cfg)
         bus.load_database("demo", str(SAMPLE_DBC))
-        start_demo_traffic("demo0")
+        bus.demo_stop = start_demo_traffic("demo0")
         bus.demo = True
 
     if args.mcp_stdio:

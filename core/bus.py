@@ -66,6 +66,7 @@ class Bus:
         self._replay_info: Optional[dict] = None
         self.dropped = 0
         self.demo = False  # True when running on the built-in synthetic traffic
+        self.demo_stop = None  # set() to end the synthetic traffic
 
     # ------------------------------------------------------------------ config
     def set_channel(self, cfg: ChannelConfig) -> ChannelConfig:
@@ -90,6 +91,16 @@ class Bus:
             self.stats.pop(name, None)
             self._db_files.pop(name, None)
             self._msg_index.pop(name, None)
+
+    def end_demo(self) -> None:
+        """Leave the built-in demo: stop it, drop its channel, so the user can add a real adapter."""
+        if not self.demo:
+            return
+        self.stop()
+        if self.demo_stop is not None:
+            self.demo_stop.set()
+        self.remove_channel("demo")
+        self.demo = False
 
     def list_channels(self) -> list[dict]:
         with self._lock:

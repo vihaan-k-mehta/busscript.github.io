@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.util
+import importlib
 import importlib.metadata as md
 import sys
 from pathlib import Path
@@ -32,10 +33,18 @@ DRIVERS = [
 ]
 
 
+_MODULE = {"python-can": "can", "pyserial": "serial"}
+
+
 def _version(pkg: str) -> str | None:
     try:
         return md.version(pkg)
     except md.PackageNotFoundError:
+        pass
+    try:                                    # a bundled program has no package metadata: ask the library itself
+        mod = importlib.import_module(_MODULE.get(pkg, pkg))
+        return str(getattr(mod, "__version__", "") or "installed")
+    except Exception:
         return None
 
 
